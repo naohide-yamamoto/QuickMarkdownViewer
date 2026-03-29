@@ -1,0 +1,28 @@
+# macOS metadata
+.DS_Store
+
+# Xcode build artefacts
+DerivedData/
+.DerivedData/
+build/
+*.xcarchive
+dist/
+
+# Xcode user-specific state
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+
+# Swift Package Manager local state
+.swiftpm/
+
+# Local-only planning/release notes (do not publish)
+ACADEMIC_PLAN.local.md
+DISTRIBUTION_CHECKLIST.local.md
+RELEASE_HANDOVER.local.md
+PUBLIC_GITHUB_RELEASE_PLAN.local.md
+APACHE_OPEN_SOURCE_CHECKLIST_QMV.local.md
+
+# Local-only website draft (do not publish)
+website/

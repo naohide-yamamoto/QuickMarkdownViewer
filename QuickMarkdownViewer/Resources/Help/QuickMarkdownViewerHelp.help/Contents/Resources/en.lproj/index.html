@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="AppleTitle" content="Quick Markdown Viewer Help">
+  <meta name="description" content="Help for Quick Markdown Viewer">
+  <meta name="keywords" content="quick markdown viewer, markdown, help, open, search, zoom, print, export">
+  <title>Quick Markdown Viewer Help</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+    }
+
+    body {
+      margin: 0;
+      padding: 28px 24px 48px;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      line-height: 1.55;
+      max-width: 920px;
+      margin-inline: auto;
+    }
+
+    h1, h2, h3 {
+      line-height: 1.25;
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 0.4rem;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin-top: 2.2rem;
+      margin-bottom: 0.7rem;
+      font-size: 1.35rem;
+      border-bottom: 1px solid color-mix(in srgb, currentColor 20%, transparent);
+      padding-bottom: 0.2rem;
+    }
+
+    ul, ol {
+      padding-left: 1.35rem;
+    }
+
+    li {
+      margin: 0.2rem 0;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 0.93em;
+      background: color-mix(in srgb, currentColor 12%, transparent);
+      padding: 0.08rem 0.33rem;
+      border-radius: 0.35rem;
+    }
+
+    a {
+      color: color-mix(in srgb, LinkText 88%, currentColor 12%);
+    }
+
+    .subtle {
+      color: color-mix(in srgb, currentColor 64%, transparent);
+    }
+
+    .toc {
+      padding: 0.9rem 1rem;
+      border-radius: 0.65rem;
+      background: color-mix(in srgb, currentColor 8%, transparent);
+      margin: 1rem 0 1.6rem;
+    }
+  </style>
+</head>
+<body>
+  <a id="index" name="index"></a>
+  <h1>Quick Markdown Viewer</h1>
+  <p>Quick Markdown Viewer is a simple app for opening Markdown files as clean, rendered documents on macOS.</p>
+  <p>It is designed for people who just want to read Markdown quickly, without editing tools or setup.</p>
+  <p>Quick Markdown Viewer is free and open-source. If you find it useful, <a href="https://ko-fi.com/naohideyamamoto">optional contributions are greatly appreciated</a> and help cover ongoing maintenance costs. Contributions are voluntary and do not change Quick Markdown Viewer&rsquo;s functionality.</p>
+  <p class="subtle">For developer and release details, see the repository&rsquo;s <code>README.developers.md</code>.</p>
+
+  <div class="toc">
+    <strong>Contents</strong>
+    <ul>
+      <li><a href="#what-quick-markdown-viewer-is-for">What Quick Markdown Viewer Is For</a></li>
+      <li><a href="#system-requirements">System Requirements</a></li>
+      <li><a href="#quick-start">Quick Start</a></li>
+      <li><a href="#supported-file-types">Supported File Types</a></li>
+      <li><a href="#markdown-compatibility">Markdown Compatibility</a></li>
+      <li><a href="#set-as-the-default-app-in-finder">Set as the Default App in Finder</a></li>
+      <li><a href="#full-functionality">Full Functionality</a></li>
+      <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
+      <li><a href="#licence">Licence</a></li>
+      <li><a href="#official-builds-and-forks">Official Builds and Forks</a></li>
+      <li><a href="#no-warranty">No Warranty</a></li>
+      <li><a href="#known-issues">Known Issues</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#what-quick-markdown-viewer-is-not-for">What Quick Markdown Viewer Is Not For</a></li>
+      <li><a href="#support">Support</a></li>
+    </ul>
+  </div>
+
+  <h2 id="what-quick-markdown-viewer-is-for">What Quick Markdown Viewer Is For</h2>
+  <ul>
+    <li>Quickly opening Markdown files with proper headings, lists, tables, images, and other common Markdown features.</li>
+    <li>Reading Markdown locally on your Mac without uploading documents to a remote rendering service.</li>
+    <li>A lightweight &lsquo;Preview for Markdown&rsquo; workflow on Mac.</li>
+  </ul>
+
+  <h2 id="system-requirements">System Requirements</h2>
+  <ul>
+    <li>macOS 13 or newer.</li>
+    <li>Apple Silicon Mac is the primary target.</li>
+  </ul>
+
+  <h2 id="quick-start">Quick Start</h2>
+  <ol>
+    <li>Go to this repository&rsquo;s Releases page.</li>
+    <li>Download the latest app ZIP (<code>Quick Markdown Viewer-macOS.zip</code>).</li>
+    <li>Open the ZIP and drag <code>Quick Markdown Viewer.app</code> into <code>Applications</code>.</li>
+    <li>Open the app once.</li>
+    <li>Open a Markdown file by either:
+      <ul>
+        <li>double-clicking a supported Markdown file associated with Quick Markdown Viewer</li>
+        <li>right-clicking a Markdown file and choosing <strong>Open With &gt; Quick Markdown Viewer</strong></li>
+        <li>opening the app and pressing <code>⌘O</code></li>
+      </ul>
+    </li>
+  </ol>
+
+  <h2 id="supported-file-types">Supported File Types</h2>
+  <p>Quick Markdown Viewer accepts:</p>
+  <ul>
+    <li><code>.md</code></li>
+    <li><code>.markdown</code></li>
+    <li><code>.mdown</code></li>
+    <li><code>.mkd</code></li>
+    <li><code>.mkdn</code></li>
+    <li><code>.mdwn</code></li>
+  </ul>
+  <p>Quick Markdown Viewer intentionally does not support:</p>
+  <ul>
+    <li><code>.rmd</code></li>
+    <li><code>.qmd</code></li>
+  </ul>
+
+  <h2 id="markdown-compatibility">Markdown Compatibility</h2>
+  <p>Quick Markdown Viewer is intended for standard Markdown document rendering. It is not designed to reproduce non-standard or modified Markdown formats. For example, GitHub-style links to section headings are not a Quick Markdown Viewer compatibility target.</p>
+
+  <h2 id="set-as-the-default-app-in-finder">Set as the Default App in Finder</h2>
+  <ol>
+    <li>Select a Markdown file in Finder and press <code>⌘I</code>.</li>
+    <li>In <strong>Open with</strong>, choose <strong>Quick Markdown Viewer</strong>.</li>
+    <li>Click <strong>Change All&hellip;</strong>.</li>
+  </ol>
+
+  <h2 id="full-functionality">Full Functionality</h2>
+  <ul>
+    <li>Read-only Markdown viewing (no editing surface).</li>
+    <li>One document per window.</li>
+    <li>File open from:
+      <ul>
+        <li>double-click in Finder (when associated)</li>
+        <li><code>File &gt; Open</code> (<code>⌘O</code>)</li>
+        <li>drag and drop</li>
+        <li><code>File &gt; Open Recent</code></li>
+      </ul>
+    </li>
+    <li>External links open in your default browser or mail app.</li>
+    <li>Local Markdown links open in a new Quick Markdown Viewer window.</li>
+    <li>Relative local images are rendered from the document folder.</li>
+    <li>In-document search:
+      <ul>
+        <li><code>⌘F</code> find</li>
+        <li><code>⌘G</code> next</li>
+        <li><code>Shift+⌘G</code> previous</li>
+        <li>case-insensitive and case-sensitive modes</li>
+      </ul>
+    </li>
+    <li>Zoom controls:
+      <ul>
+        <li>zoom in/out</li>
+        <li>actual size (100%)</li>
+        <li>zoom to fit</li>
+      </ul>
+    </li>
+    <li>Light/dark mode toggle.</li>
+    <li>Print rendered Markdown (<code>⌘P</code>).</li>
+    <li>Export rendered Markdown as PDF.</li>
+    <li>View raw source in your default plain-text editor.</li>
+  </ul>
+
+  <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
+  <ul>
+    <li><code>⌘O</code>: open file</li>
+    <li><code>⌘F</code>: find in document</li>
+    <li><code>⌘G</code>: find next</li>
+    <li><code>Shift+⌘G</code>: find previous</li>
+    <li><code>⌘P</code>: print</li>
+    <li><code>⌘0</code>: actual size (100%)</li>
+    <li><code>⌘9</code>: zoom to fit</li>
+    <li><code>Shift+⌘L</code>: toggle light/dark mode</li>
+  </ul>
+
+  <h2 id="licence">Licence</h2>
+  <p>Quick Markdown Viewer source code is licensed under the Apache License, Version 2.0.</p>
+  <p>See <code>LICENSE</code> for the full licence text, <code>NOTICE</code> for project attribution, and <code>THIRD_PARTY_NOTICES.md</code> for bundled third-party notices.</p>
+  <p>The Quick Markdown Viewer name, app icon, and related branding are not licensed under Apache-2.0. See <code>TRADEMARKS.md</code>.</p>
+
+  <h2 id="official-builds-and-forks">Official Builds and Forks</h2>
+  <p>Quick Markdown Viewer is open-source software. You are welcome to read the code, build it, fork it, and modify it under the terms of the Apache License, Version 2.0.</p>
+  <p>Official public builds are only those released by Naohide Yamamoto through this repository&rsquo;s Releases page and signed/notarised by Naohide Yamamoto.</p>
+  <p>If you obtain Quick Markdown Viewer from another source, or from a fork, treat that build as unofficial unless it is clearly identified as an official release from this repository and carries the expected signing/notarisation status.</p>
+  <p>If you redistribute a modified build, please rename the app and replace the icon and related branding unless you have explicit permission to use the official Quick Markdown Viewer branding.</p>
+
+  <h2 id="no-warranty">No Warranty</h2>
+  <p>Quick Markdown Viewer is provided under the Apache License, Version 2.0 on an &lsquo;AS IS&rsquo; basis, without warranties or conditions of any kind.</p>
+  <p>You are responsible for reviewing, building, and using the software at your own risk.</p>
+
+  <h2 id="known-issues">Known Issues</h2>
+  <ul>
+    <li>Native macOS Help Viewer integration currently fails on some systems with the message &lsquo;The selected content is currently unavailable&rsquo;.</li>
+    <li>Current practical behaviour: <code>Help &gt; Quick Markdown Viewer Help</code> opens bundled in-app Help content directly instead of relying on Help Viewer page loading.</li>
+  </ul>
+
+  <h2 id="troubleshooting">Troubleshooting</h2>
+  <ul>
+    <li>File does not open: confirm the file extension is supported.</li>
+    <li>Image is missing: check that the image path is correct relative to the Markdown file location.</li>
+    <li><code>.md</code> opens in another app: set Quick Markdown Viewer as default via Finder (<strong>Open with &gt; Change All&hellip;</strong>).</li>
+  </ul>
+
+  <h2 id="what-quick-markdown-viewer-is-not-for">What Quick Markdown Viewer Is Not For</h2>
+  <p>Quick Markdown Viewer is not:</p>
+  <ul>
+    <li>a Markdown editor</li>
+    <li>a note-taking app</li>
+    <li>a live-preview writing environment</li>
+    <li>a knowledge base or file-browser workspace</li>
+    <li>an IDE-style tool</li>
+  </ul>
+  <p>There are no tabs, plugins, cloud sync, collaborative features, or advanced authoring workflows.</p>
+
+  <h2 id="support">Support</h2>
+  <p>For bug reports, feature requests, and general help, please use this repository&rsquo;s GitHub Issues page.</p>
+  <p>For other project-related enquiries, you can also contact Naohide Yamamoto at <a href="mailto:hello@quickmarkdownviewer.app">hello@quickmarkdownviewer.app</a>.</p>
+  <p class="subtle">Support is provided on a best-effort basis.</p>
+</body>
+</html>

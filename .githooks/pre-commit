@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Enforce local-signing hygiene before every commit.
+#
+# Why this exists:
+# - Team/signing metadata can be written into the shared Xcode project file
+#   when a local Apple Developer Team is selected in Xcode.
+# - Build/export artefacts under dist/ can include local signing metadata.
+#
+# This hook blocks commits that stage either:
+# 1) known local build artefacts, or
+# 2) newly-added Team/provisioning lines in project.pbxproj.
+
+PROJECT_FILE="QuickMarkdownViewer.xcodeproj/project.pbxproj"
+
+staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+if [[ -z "${staged_files}" ]]; then
+  exit 0
+fi
+
+# Block staging local release artefacts that are never meant for Git.
+while IFS= read -r path; do
+  [[ -z "${path}" ]] && continue
+
+  if [[ "${path}" == dist/* || "${path}" == *.xcarchive* ]]; then
+    echo "❌ Commit blocked: local build/export artefact staged: ${path}" >&2
+    echo "   Remove it from staging with: git restore --staged '${path}'" >&2
+    exit 1
+  fi
+done <<< "${staged_files}"
+
+# If project.pbxproj is staged, inspect only newly-added lines for sensitive
+# local signing fields. Existing baseline lines are not re-checked unless
+# changed in this commit.
+if grep -Fxq "${PROJECT_FILE}" <<< "${staged_files}"; then
+  added_project_lines="$(git diff --cached -- "${PROJECT_FILE}" | grep '^+' || true)"
+
+  if grep -Eq '^\+.*DEVELOPMENT_TEAM[[:space:]]*=' <<< "${added_project_lines}"; then
+    echo "❌ Commit blocked: DEVELOPMENT_TEAM was added to ${PROJECT_FILE}." >&2
+    echo "   Keep Team selection local and do not commit it." >&2
+    echo "   Suggested fix: git restore -- ${PROJECT_FILE}" >&2
+    exit 1
+  fi
+
+  if grep -Eq '^\+.*PROVISIONING_PROFILE' <<< "${added_project_lines}"; then
+    echo "❌ Commit blocked: provisioning profile metadata was added to ${PROJECT_FILE}." >&2
+    echo "   Keep provisioning details local and out of Git." >&2
+    echo "   Suggested fix: git restore -- ${PROJECT_FILE}" >&2
+    exit 1
+  fi
+fi
+
+exit 0

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Basic document metadata for local rendering in WKWebView. -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!--
+      Content Security Policy:
+      - Blocks all network and frame/object content by default.
+      - Allows only inline style/script required by bundled renderer assets.
+      - Allows image data from local files and data URLs.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; img-src 'self' file: data:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'self' file:;"
+    >
+
+    <!--
+      Forces relative links and image paths to resolve from the opened
+      Markdown file directory.
+    -->
+    <base href="{{DOCUMENT_BASE_URL}}">
+
+    <!-- Styles are injected by MarkdownRenderService at runtime. -->
+    <style>{{STYLES_CSS}}</style>
+  </head>
+  <body>
+    <!-- Render target for generated Markdown HTML. -->
+    <main id="content" class="content"></main>
+
+    <!-- Bundled Markdown engine and app-owned renderer code. -->
+    <script>{{MARKDOWN_IT_JS}}</script>
+    <script>{{RENDERER_JS}}</script>
+
+    <!-- Bootstraps rendering using escaped Markdown source injected in Swift. -->
+    <script>
+      window.QuickMarkdownViewerRenderer.renderFromSource({{MARKDOWN_SOURCE_JSON}});
+    </script>
+  </body>
+</html>

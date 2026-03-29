@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Enforce local-signing hygiene before every push.
+#
+# This is a second guard in case a commit was created with --no-verify or from
+# another workflow path. We inspect the current tracked project file content and
+# block pushes that contain committed Team metadata.
+
+PROJECT_FILE="QuickMarkdownViewer.xcodeproj/project.pbxproj"
+
+if [[ -f "${PROJECT_FILE}" ]]; then
+  if grep -Eq '^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=' "${PROJECT_FILE}"; then
+    echo "❌ Push blocked: ${PROJECT_FILE} contains DEVELOPMENT_TEAM." >&2
+    echo "   Keep Team selection local and remove it from committed project settings." >&2
+    exit 1
+  fi
+fi
+
+# Also ensure no tracked dist artefacts are being pushed.
+if git ls-files --error-unmatch dist >/dev/null 2>&1; then
+  echo "❌ Push blocked: dist/ is tracked in Git. It must remain local-only." >&2
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,374 @@
+/*
+  QuickMarkdownViewer reading stylesheet.
+
+  Design goals:
+  - calm, document-first presentation
+  - comfortable line length and spacing
+  - solid contrast in both light and dark appearance
+*/
+
+:root {
+  color-scheme: light dark;
+
+  /* Light palette */
+  --page-bg-light: #f6f5f2;
+  --card-bg-light: #ffffff;
+  --text-light: #1f2933;
+  --muted-light: #5a6570;
+  --rule-light: #dde3ea;
+  --code-bg-light: #f2f5f8;
+
+  /* Dark palette */
+  --page-bg-dark: #16181b;
+  --card-bg-dark: #1f2328;
+  --text-dark: #e8edf2;
+  --muted-dark: #b5bdc8;
+  --rule-dark: #36404a;
+  --code-bg-dark: #252b32;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--page-bg-light);
+  color: var(--text-light);
+  font: 17px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+/* Main reading column */
+.content {
+  width: min(100%, 840px);
+  margin: 28px auto 44px;
+  padding: 32px clamp(20px, 3.5vw, 44px);
+  background: var(--card-bg-light);
+  border: 1px solid var(--rule-light);
+  border-radius: 16px;
+  overflow-x: auto;
+}
+
+/* Typographic rhythm */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.25;
+  margin: 1.4em 0 0.55em;
+  font-weight: 650;
+}
+
+h1 {
+  margin-top: 0;
+  font-size: clamp(1.75rem, 2.6vw, 2.3rem);
+}
+
+h2 {
+  font-size: clamp(1.3rem, 2.2vw, 1.75rem);
+}
+
+h3 {
+  font-size: clamp(1.1rem, 1.8vw, 1.4rem);
+}
+
+p,
+li,
+blockquote,
+td,
+th {
+  font-size: 1rem;
+}
+
+p,
+ul,
+ol,
+pre,
+table,
+blockquote,
+hr {
+  margin: 1em 0;
+}
+
+/* Link treatment remains obvious but not editor-like */
+a {
+  color: #0d63d6;
+  text-decoration-thickness: 0.08em;
+  text-underline-offset: 0.13em;
+}
+
+a:hover {
+  text-decoration-thickness: 0.12em;
+}
+
+/* In-document find highlighting */
+mark.quickmarkdownviewer-find-hit {
+  background: #ffe48d;
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 0.08em;
+}
+
+mark.quickmarkdownviewer-find-hit-active {
+  background: #ff9f0a;
+  color: #17120a;
+  border-radius: 3px;
+  padding: 0 0.08em;
+  box-shadow: 0 0 0 1px rgba(120, 66, 8, 0.34);
+}
+
+/* Code presentation */
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+code {
+  background: var(--code-bg-light);
+  padding: 0.14em 0.36em;
+  border-radius: 6px;
+  font-size: 0.92em;
+}
+
+pre {
+  background: var(--code-bg-light);
+  padding: 14px 16px;
+  border-radius: 10px;
+  overflow-x: auto;
+  border: 1px solid var(--rule-light);
+}
+
+pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+/* Block-level elements */
+blockquote {
+  padding: 0.1em 1em;
+  border-left: 4px solid var(--rule-light);
+  color: var(--muted-light);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+
+th,
+td {
+  border: 1px solid var(--rule-light);
+  padding: 0.5em 0.7em;
+  text-align: left;
+}
+
+th {
+  background: color-mix(in srgb, var(--code-bg-light) 74%, #ffffff 26%);
+  font-weight: 600;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+hr {
+  border: 0;
+  height: 1px;
+  background: var(--rule-light);
+}
+
+/* Compact spacing on narrower windows */
+@media (max-width: 740px) {
+  .content {
+    margin: 12px;
+    padding: 22px 18px;
+    border-radius: 12px;
+  }
+}
+
+/* Dark appearance overrides */
+@media (prefers-color-scheme: dark) {
+  body {
+    background: var(--page-bg-dark);
+    color: var(--text-dark);
+  }
+
+  .content {
+    background: var(--card-bg-dark);
+    border-color: var(--rule-dark);
+  }
+
+  a {
+    color: #7bb4ff;
+  }
+
+  mark.quickmarkdownviewer-find-hit {
+    background: #7a6016;
+    color: #fff4cc;
+  }
+
+  mark.quickmarkdownviewer-find-hit-active {
+    background: #ffd166;
+    color: #251600;
+    box-shadow: 0 0 0 1px rgba(255, 214, 122, 0.52);
+  }
+
+  code,
+  pre {
+    background: var(--code-bg-dark);
+  }
+
+  pre {
+    border-color: var(--rule-dark);
+  }
+
+  blockquote {
+    color: var(--muted-dark);
+    border-left-color: var(--rule-dark);
+  }
+
+  th,
+  td,
+  hr {
+    border-color: var(--rule-dark);
+    background: transparent;
+  }
+}
+
+/*
+  Dedicated print/PDF output styling.
+
+  The same rules are applied for:
+  - `@media print` (native print workflow)
+  - `.qmv-print-output` class (explicit mode used before PDF export)
+
+  Goal: export/print only the document content in a clean light presentation,
+  without the outer reading canvas or dark-mode backgrounds.
+*/
+@media print {
+  @page {
+    /*
+      Keep CSS page margin at zero and let AppKit `NSPrintInfo` control
+      margins. This avoids compounding CSS + AppKit margins in exported PDFs.
+    */
+    margin: 0;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: var(--text-light) !important;
+    padding: 0 !important;
+  }
+
+  .content {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    overflow: visible !important;
+    box-sizing: border-box !important;
+  }
+
+  /* During actual print flows, rely on page margins rather than body padding. */
+  body.qmv-print-output {
+    padding: 0 !important;
+  }
+
+  table {
+    display: table !important;
+    width: 100% !important;
+    overflow: visible !important;
+  }
+
+  pre {
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+  }
+
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+}
+
+body.qmv-print-output {
+  background: #ffffff !important;
+  color: var(--text-light) !important;
+  padding: 0 !important;
+}
+
+body.qmv-print-output .content {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: visible !important;
+  box-sizing: border-box !important;
+}
+
+body.qmv-print-output a {
+  color: #0d63d6 !important;
+}
+
+body.qmv-print-output code,
+body.qmv-print-output pre {
+  background: var(--code-bg-light) !important;
+}
+
+body.qmv-print-output pre {
+  border-color: var(--rule-light) !important;
+  overflow: visible !important;
+  white-space: pre-wrap !important;
+  word-break: break-word !important;
+}
+
+body.qmv-print-output table {
+  display: table !important;
+  width: 100% !important;
+  overflow: visible !important;
+}
+
+body.qmv-print-output img {
+  max-width: 100% !important;
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+
+body.qmv-print-output blockquote {
+  color: var(--muted-light) !important;
+  border-left-color: var(--rule-light) !important;
+}
+
+body.qmv-print-output th,
+body.qmv-print-output td {
+  border-color: var(--rule-light) !important;
+}
+
+body.qmv-print-output th {
+  background: color-mix(in srgb, var(--code-bg-light) 74%, #ffffff 26%) !important;
+}
+
+body.qmv-print-output hr {
+  background: var(--rule-light) !important;
+}
