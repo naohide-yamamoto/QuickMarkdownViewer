@@ -106,15 +106,15 @@ scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
 After a successful run:
 
 - `dist/export/Quick Markdown Viewer.app`
-- `dist/release/Quick Markdown Viewer-macOS.zip`
-- `dist/release/Quick Markdown Viewer-macOS-SHA256.txt`
+- `dist/release/QuickMarkdownViewer-macOS.zip`
+- `dist/release/QuickMarkdownViewer-macOS-SHA256.txt`
 
 ## 5. GitHub release upload checklist
 
 1. Create a new GitHub Release for the version tag.
 2. Upload:
-   - `Quick Markdown Viewer-macOS.zip`
-   - `Quick Markdown Viewer-macOS-SHA256.txt`
+   - `QuickMarkdownViewer-macOS.zip`
+   - `QuickMarkdownViewer-macOS-SHA256.txt`
 3. In release notes, state that this build is officially signed and notarised.
 
 ## 6. Troubleshooting

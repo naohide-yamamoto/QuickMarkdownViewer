@@ -67,8 +67,15 @@ fi
 
 mkdir -p "${OUTPUT_DIR}"
 APP_BASENAME="$(basename "${APP_PATH}" .app)"
-ZIP_PATH="${OUTPUT_DIR}/${APP_BASENAME}-macOS.zip"
-SHA256_PATH="${OUTPUT_DIR}/${APP_BASENAME}-macOS-SHA256.txt"
+# Release asset names are sanitised so public artefact filenames are stable
+# and shell-friendly (no spaces).
+ASSET_BASENAME="$(printf '%s' "${APP_BASENAME}" | tr -cd '[:alnum:]_-')"
+if [[ -z "${ASSET_BASENAME}" ]]; then
+  echo "error: could not derive a valid release asset base name from ${APP_BASENAME}" >&2
+  exit 1
+fi
+ZIP_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-macOS.zip"
+SHA256_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-macOS-SHA256.txt"
 
 echo "==> Creating release ZIP"
 rm -f "${ZIP_PATH}" "${SHA256_PATH}"
@@ -85,7 +92,10 @@ echo "==> Gatekeeper validation"
 spctl -a -t exec -vv "${APP_PATH}"
 
 echo "==> Writing SHA256 checksum"
-shasum -a 256 "${ZIP_PATH}" > "${SHA256_PATH}"
+(
+  cd "${OUTPUT_DIR}"
+  shasum -a 256 "$(basename "${ZIP_PATH}")" > "$(basename "${SHA256_PATH}")"
+)
 
 echo "==> Release artefacts ready"
 echo "App:      ${APP_PATH}"

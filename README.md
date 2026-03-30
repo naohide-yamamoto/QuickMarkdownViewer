@@ -43,7 +43,7 @@ For developer and release details, see [README.developers.md](README.developers.
 ## Quick Start
 
 1. Go to this repository's **Releases** page.
-2. Download the latest app ZIP (`Quick Markdown Viewer-macOS.zip`).
+2. Download the latest app ZIP (`QuickMarkdownViewer-macOS.zip`).
 3. Open the ZIP and drag `Quick Markdown Viewer.app` into `Applications`.
 4. Open the app once.
 5. Open a Markdown file by either:

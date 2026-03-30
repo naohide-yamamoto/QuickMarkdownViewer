@@ -89,6 +89,8 @@ scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY --team-id Y
 This produces:
 - a signed exported app bundle in `dist/export`
 - a notarised ZIP and SHA256 checksum in `dist/release`
+  - `QuickMarkdownViewer-macOS.zip`
+  - `QuickMarkdownViewer-macOS-SHA256.txt`
 
 Full instructions are in [RELEASING.md](RELEASING.md).
 
