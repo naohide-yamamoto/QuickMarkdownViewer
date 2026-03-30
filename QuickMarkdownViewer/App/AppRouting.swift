@@ -579,7 +579,7 @@ final class AppRouting: ObservableObject {
     /// Forces the app into light appearance and persists the selection.
     ///
     /// This supports explicit one-tap mode selection from the document
-    /// top bar without requiring users to cycle through a toggle action.
+    /// toolbar without requiring users to cycle through a toggle action.
     func setLightAppearanceMode() {
         setPersistedAppearanceMode(.light)
         applyAppearance(.light)
@@ -588,7 +588,7 @@ final class AppRouting: ObservableObject {
     /// Forces the app into dark appearance and persists the selection.
     ///
     /// This supports explicit one-tap mode selection from the document
-    /// top bar without requiring users to cycle through a toggle action.
+    /// toolbar without requiring users to cycle through a toggle action.
     func setDarkAppearanceMode() {
         setPersistedAppearanceMode(.dark)
         applyAppearance(.dark)

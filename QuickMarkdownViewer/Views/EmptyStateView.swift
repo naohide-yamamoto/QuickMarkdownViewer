@@ -17,7 +17,7 @@ struct EmptyStateView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 12) {
-                Image(systemName: "doc.text.magnifyingglass")
+                Image(systemName: "doc.text")
                     .font(.system(size: 44, weight: .regular))
                     .foregroundStyle(.secondary)
 
@@ -30,7 +30,7 @@ struct EmptyStateView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("• Drop the file here")
                     Text("• Choose File > Open (or press ⌘O)")
-                    Text("• Click the folder icon in the top bar")
+                    Text("• Click the folder icon in the toolbar")
                     Text("• Click the button below")
                 }
                 .font(.title3)

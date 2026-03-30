@@ -71,11 +71,11 @@ struct AppCommands: Commands {
 
         // Add document actions that belong near print/open in the File menu.
         CommandGroup(after: .printItem) {
-            // Share/export glyph keeps export affordance recognisable.
+            // Export-specific glyph avoids confusion with Share actions.
             Button(action: {
                 routing.exportRenderedPDFInActiveWindow()
             }) {
-                Label("Export as PDF…", systemImage: "square.and.arrow.up")
+                Label("Export as PDF…", systemImage: "square.and.arrow.up.on.square")
             }
 
             // Plain-text document glyph signals raw Markdown source viewing.

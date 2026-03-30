@@ -177,7 +177,7 @@ struct DocumentWindowView: View {
         }
     }
 
-    /// Top control bar shown at all times.
+    /// Toolbar controls shown at all times.
     ///
     /// Layout intentionally mirrors utility viewers such as Preview:
     /// - quick Open button
@@ -219,7 +219,7 @@ struct DocumentWindowView: View {
                     isCaseSensitive: $isCaseSensitiveSearch,
                     isEnabled: canUseDocumentControls,
                     isFocused: $isFindFieldFocused,
-                    placeholder: "Find in document",
+                    placeholder: "Search",
                     onSubmit: {
                         runFind(direction: .forwards, shouldBeepOnNoMatch: true)
                     },
@@ -444,7 +444,7 @@ struct DocumentWindowView: View {
         }
     }
 
-    /// Applies the top-bar zoom-out button action.
+    /// Applies the toolbar zoom-out button action.
     private func zoomOutFromBar() {
         guard canUseDocumentControls else {
             NSSound.beep()
@@ -457,7 +457,7 @@ struct DocumentWindowView: View {
         }
     }
 
-    /// Applies the top-bar actual-size button action.
+    /// Applies the toolbar actual-size button action.
     private func resetZoomFromBar() {
         guard canUseDocumentControls else {
             NSSound.beep()
@@ -470,7 +470,7 @@ struct DocumentWindowView: View {
         }
     }
 
-    /// Applies the top-bar zoom-in button action.
+    /// Applies the toolbar zoom-in button action.
     private func zoomInFromBar() {
         guard canUseDocumentControls else {
             NSSound.beep()
@@ -692,7 +692,7 @@ struct DocumentWindowView: View {
     }
 }
 
-/// Native macOS search field wrapper used by the top control bar.
+/// Native macOS search field wrapper used by the toolbar controls.
 ///
 /// Using `NSSearchField` gives QuickMarkdownViewer the expected AppKit behaviour:
 /// - familiar visual style
@@ -976,7 +976,7 @@ private struct NativeSearchField: NSViewRepresentable {
 /// Native macOS segmented control for print and PDF export actions.
 ///
 /// Keeping these actions in the same AppKit segmented style as the rest of the
-/// top bar preserves a consistent, Preview-like control surface.
+/// toolbar preserves a consistent, Preview-like control surface.
 private struct DocumentActionSegmentedControl: NSViewRepresentable {
     /// Controls whether document actions are currently available.
     let isEnabled: Bool
@@ -995,7 +995,7 @@ private struct DocumentActionSegmentedControl: NSViewRepresentable {
         let control = NSSegmentedControl()
         control.segmentCount = 2
         control.trackingMode = .momentary
-        // Match the same grouped AppKit style used by the other top-bar controls.
+        // Match the same grouped AppKit style used by the other toolbar controls.
         control.segmentStyle = .separated
         control.controlSize = .regular
         control.target = context.coordinator
@@ -1010,7 +1010,7 @@ private struct DocumentActionSegmentedControl: NSViewRepresentable {
 
         // Segment 1: export rendered document as PDF.
         control.setImage(
-            NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Export as PDF"),
+            NSImage(systemSymbolName: "square.and.arrow.up.on.square", accessibilityDescription: "Export as PDF"),
             forSegment: 1
         )
         control.setWidth(56, forSegment: 1)
