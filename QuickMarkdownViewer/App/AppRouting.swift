@@ -86,6 +86,12 @@ enum QuickMarkdownViewerDocumentCommand: String {
 
     /// Open the source Markdown file in the system default text editor.
     case viewSourceExternally
+
+    /// Start speaking selected text, or fall back to full document content.
+    case startSpeaking
+
+    /// Stop any in-progress document speech.
+    case stopSpeaking
 }
 
 /// Keys used in `quickMarkdownViewerDocumentCommand` notification payloads.
@@ -331,6 +337,23 @@ final class QuickMarkdownViewerAppDelegate: NSObject, NSApplicationDelegate {
 /// Main app router responsible for opening files and creating document windows.
 @MainActor
 final class AppRouting: ObservableObject {
+    /// One native share-service entry shown under File > Share.
+    struct ShareServiceEntry: Identifiable {
+        /// Stable identifier used by SwiftUI menu rendering.
+        let id: String
+
+        /// User-visible menu title from `NSSharingService`.
+        let title: String
+
+        /// Optional menu icon from `NSSharingService`.
+        let image: NSImage?
+
+        /// Backing AppKit share service invoked on selection.
+        let service: NSSharingService
+
+        /// Document URL associated with this menu snapshot.
+        let fileURL: URL
+    }
     /// Shared router instance used by SwiftUI commands and AppKit delegate flow.
     static let shared = AppRouting()
 
@@ -550,6 +573,52 @@ final class AppRouting: ObservableObject {
     /// Dispatches a view-source command for the active document window.
     func viewSourceExternallyInActiveWindow() {
         dispatchDocumentCommandToActiveWindow(.viewSourceExternally)
+    }
+
+    /// Returns true when Start Speaking should be available for the active window.
+    func canStartSpeechInActiveWindow() -> Bool {
+        hasActiveDocumentWindowForCommands
+    }
+
+    /// Returns true when Stop Speaking should be available for the active window.
+    func canStopSpeechInActiveWindow() -> Bool {
+        hasActiveDocumentWindowForCommands
+    }
+
+    /// Starts speech from the active document.
+    func startSpeakingInActiveWindow() {
+        dispatchDocumentCommandToActiveWindow(.startSpeaking)
+    }
+
+    /// Stops active speech for the current document.
+    func stopSpeakingInActiveWindow() {
+        dispatchDocumentCommandToActiveWindow(.stopSpeaking)
+    }
+
+    /// Returns native share services for the currently active document window.
+    ///
+    /// This powers the File > Share submenu so users see system-provided share
+    /// destinations directly in the menu hierarchy (Preview-like behaviour).
+    func shareServicesForActiveDocument() -> [ShareServiceEntry] {
+        guard let fileURL = activeDocumentFileURLForCommands() else {
+            return []
+        }
+
+        return NSSharingService.sharingServices(forItems: [fileURL]).enumerated().map { index, service in
+            let identifierComponent = service.title.replacingOccurrences(of: " ", with: "-").lowercased()
+            return ShareServiceEntry(
+                id: "\(identifierComponent)-\(index)",
+                title: service.title,
+                image: service.image,
+                service: service,
+                fileURL: fileURL
+            )
+        }
+    }
+
+    /// Executes one share service selected from File > Share.
+    func performShareService(_ entry: ShareServiceEntry) {
+        entry.service.perform(withItems: [entry.fileURL])
     }
 
     /// Applies the persisted appearance mode after app launch.
@@ -1114,6 +1183,30 @@ final class AppRouting: ObservableObject {
                 QuickMarkdownViewerDocumentCommandUserInfoKey.command.rawValue: command.rawValue
             ]
         )
+    }
+
+    /// Returns the active document URL suitable for command-driven actions.
+    ///
+    /// We intentionally use window `representedURL` here because it tracks the
+    /// currently open source file for each QuickMarkdownViewer document window.
+    private func activeDocumentFileURLForCommands() -> URL? {
+        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
+              targetWindow.styleMask.contains(.titled),
+              let representedURL = targetWindow.representedURL else {
+            return nil
+        }
+
+        return representedURL.standardizedFileURL
+    }
+
+    /// Returns whether the active titled window currently hosts a document URL.
+    private var hasActiveDocumentWindowForCommands: Bool {
+        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
+              targetWindow.styleMask.contains(.titled) else {
+            return false
+        }
+
+        return targetWindow.representedURL != nil
     }
 
     /// Returns the persisted explicit appearance mode, if any.

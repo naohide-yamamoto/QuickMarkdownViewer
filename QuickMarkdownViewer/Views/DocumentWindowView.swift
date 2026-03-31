@@ -41,6 +41,9 @@ struct DocumentWindowView: View {
     /// Shared bridge used to run Find/Zoom operations inside `WKWebView`.
     @StateObject private var webViewSearchBridge = MarkdownWebViewSearchBridge()
 
+    /// Native speech synthesiser scoped to this document window.
+    @State private var speechSynthesizer = NSSpeechSynthesizer()
+
     /// Current Find query text.
     @State private var findQuery = ""
 
@@ -441,6 +444,12 @@ struct DocumentWindowView: View {
 
         case .viewSourceExternally:
             viewSourceExternally()
+
+        case .startSpeaking:
+            startSpeaking()
+
+        case .stopSpeaking:
+            stopSpeaking()
         }
     }
 
@@ -567,6 +576,50 @@ struct DocumentWindowView: View {
                 }
             }
         }
+    }
+
+    /// Speaks selected text when present, otherwise speaks the full document.
+    private func startSpeaking() {
+        guard canUseDocumentControls else {
+            NSSound.beep()
+            return
+        }
+
+        let fallbackMarkdown = documentState.document?.rawMarkdown ?? ""
+
+        webViewSearchBridge.selectedText { selectedText in
+            DispatchQueue.main.async {
+                let trimmedSelection = selectedText?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let preferredText = (trimmedSelection?.isEmpty == false)
+                    ? trimmedSelection!
+                    : fallbackMarkdown.trimmingCharacters(in: .whitespacesAndNewlines)
+
+                guard !preferredText.isEmpty else {
+                    NSSound.beep()
+                    return
+                }
+
+                if speechSynthesizer.isSpeaking {
+                    speechSynthesizer.stopSpeaking()
+                }
+
+                guard speechSynthesizer.startSpeaking(preferredText) else {
+                    NSSound.beep()
+                    return
+                }
+            }
+        }
+    }
+
+    /// Stops current speech in this document window.
+    private func stopSpeaking() {
+        guard canUseDocumentControls else {
+            NSSound.beep()
+            return
+        }
+
+        speechSynthesizer.stopSpeaking()
     }
 
     /// Returns this document view's host window when available.

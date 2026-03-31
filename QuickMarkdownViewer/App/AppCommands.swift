@@ -84,6 +84,37 @@ struct AppCommands: Commands {
             }) {
                 Label("View Source", systemImage: "doc.plaintext")
             }
+
+            Divider()
+
+            // Keep Share as a submenu so File > Share immediately reveals
+            // available services, matching standard macOS app behaviour.
+            Menu {
+                let shareServices = routing.shareServicesForActiveDocument()
+
+                if shareServices.isEmpty {
+                    Button("No Share Services", action: {})
+                        .disabled(true)
+                } else {
+                    ForEach(shareServices) { entry in
+                        Button(action: {
+                            routing.performShareService(entry)
+                        }) {
+                            if let image = entry.image {
+                                Label {
+                                    Text(entry.title)
+                                } icon: {
+                                    Image(nsImage: image)
+                                }
+                            } else {
+                                Text(entry.title)
+                            }
+                        }
+                    }
+                }
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+            }
         }
 
         // Inject a dedicated Find submenu under Edit so all find-related
@@ -135,6 +166,33 @@ struct AppCommands: Commands {
                 // empty and loaded-document windows in current macOS builds.
                 Label("Find", systemImage: "doc.text.magnifyingglass")
             }
+
+            Divider()
+
+            // Surface native speech actions under Edit > Speech, aligned with
+            // standard macOS app menus.
+            Menu {
+                let canStartSpeaking = routing.canStartSpeechInActiveWindow()
+                let canStopSpeaking = routing.canStopSpeechInActiveWindow()
+
+                Button(action: {
+                    routing.startSpeakingInActiveWindow()
+                }) {
+                    Label("Start Speaking", systemImage: "play")
+                }
+                .disabled(!canStartSpeaking)
+
+                Button(action: {
+                    routing.stopSpeakingInActiveWindow()
+                }) {
+                    Label("Stop Speaking", systemImage: "stop")
+                }
+                .disabled(!canStopSpeaking)
+            } label: {
+                Label("Speech", systemImage: "text.bubble")
+            }
+
+            Divider()
         }
 
         // Add standard zoom controls in the View menu for a familiar reading
