@@ -6,7 +6,7 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
-## [1.0.5] - 2026-04-07
+## [1.0.5] - 2026-04-11
 
 ### Added
 - Native `File > Share` submenu with macOS share services for the active Markdown file.
