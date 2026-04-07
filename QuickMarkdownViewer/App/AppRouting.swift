@@ -1783,9 +1783,11 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         isSyncingFindControls = true
         defer { isSyncingFindControls = false }
 
-        if let toolbarField = toolbarSearchField,
-           toolbarField.stringValue != currentFindQuery {
-            toolbarField.stringValue = currentFindQuery
+        if let toolbarField = toolbarSearchField {
+            let isEditingToolbarField = toolbarField.currentEditor() != nil
+            if !isEditingToolbarField, toolbarField.stringValue != currentFindQuery {
+                toolbarField.stringValue = currentFindQuery
+            }
         }
 
         if let panelField = floatingFindSearchField,
@@ -2099,7 +2101,10 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     }
 
     /// Dispatches one Find query update to this window's view layer.
-    private func dispatchFindQueryUpdate(shouldBeepOnNoMatch: Bool) {
+    private func dispatchFindQueryUpdate(
+        shouldBeepOnNoMatch: Bool,
+        shouldRunSearch: Bool = true
+    ) {
         guard let hostWindow = window else {
             return
         }
@@ -2110,8 +2115,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             userInfo: [
                 QuickMarkdownViewerFindCommandUserInfoKey.command.rawValue: QuickMarkdownViewerFindCommand.setFindQuery.rawValue,
                 QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue: currentFindQuery,
-                QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isFindCaseSensitive,
-                QuickMarkdownViewerFindCommandUserInfoKey.shouldRunSearch.rawValue: true,
+                QuickMarkdownViewerFindCommandUserInfoKey.shouldRunSearch.rawValue: shouldRunSearch,
                 QuickMarkdownViewerFindCommandUserInfoKey.shouldBeepOnNoMatch.rawValue: shouldBeepOnNoMatch
             ]
         )
@@ -2132,6 +2136,11 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
                 QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isFindCaseSensitive
             ]
         )
+    }
+
+    /// Returns true when Find query text is non-empty after trimming.
+    private func hasNonEmptyFindQuery() -> Bool {
+        !currentFindQuery.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     /// Handles Open toolbar action.
@@ -2312,9 +2321,15 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
 
     /// Handles submitted Find from toolbar/panel fields.
     @objc private func submitFindFromSearchField(_ sender: NSSearchField) {
+        // Toolbar field Enter is handled in doCommandBy( insertNewline: ) to
+        // avoid re-introducing stale text during normal editing/clear actions.
+        guard sender.window === floatingFindPanel else {
+            return
+        }
+
         currentFindQuery = sender.stringValue
         syncFindControlsFromState()
-        dispatchFindQueryUpdate(shouldBeepOnNoMatch: true)
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: hasNonEmptyFindQuery())
     }
 
     /// Handles toolbar Search item activation in text-only mode.
@@ -2341,7 +2356,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             currentFindQuery = searchField.stringValue
         }
         syncFindControlsFromState()
-        dispatchFindQueryUpdate(shouldBeepOnNoMatch: true)
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: hasNonEmptyFindQuery())
         closeFloatingFindPanel()
     }
 
@@ -2406,17 +2421,17 @@ extension DocumentWindowController: NSToolbarDelegate {
 
     private static let allowedToolbarItemIdentifiers: [NSToolbarItem.Identifier] = [
         ToolbarItemIdentifier.open,
+        ToolbarItemIdentifier.zoomOutIn,
         ToolbarItemIdentifier.zoomLegacy,
-        ToolbarItemIdentifier.appearance,
-        ToolbarItemIdentifier.printExportGroup,
-        ToolbarItemIdentifier.search,
-        ToolbarItemIdentifier.share,
-        ToolbarItemIdentifier.viewSource,
         ToolbarItemIdentifier.zoomToFit,
         ToolbarItemIdentifier.actualSize,
-        ToolbarItemIdentifier.zoomOutIn,
+        ToolbarItemIdentifier.appearance,
+        ToolbarItemIdentifier.printExportGroup,
         ToolbarItemIdentifier.print,
         ToolbarItemIdentifier.exportPDF,
+        ToolbarItemIdentifier.share,
+        ToolbarItemIdentifier.viewSource,
+        ToolbarItemIdentifier.search,
         .space,
         .flexibleSpace
     ]
@@ -2535,8 +2550,6 @@ extension DocumentWindowController: NSToolbarDelegate {
             let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 220, height: 0))
             searchField.controlSize = .small
             searchField.delegate = self
-            searchField.target = self
-            searchField.action = #selector(submitFindFromSearchField(_:))
             searchField.sendsSearchStringImmediately = true
             searchField.sendsWholeSearchString = true
             searchField.placeholderString = "Search"
@@ -2674,6 +2687,38 @@ extension DocumentWindowController: NSToolbarDelegate {
 }
 
 extension DocumentWindowController: NSSearchFieldDelegate {
+    func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+        guard commandSelector == #selector(NSResponder.insertNewline(_:)),
+              let searchField = control as? NSSearchField else {
+            return false
+        }
+
+        guard !isSyncingFindControls else {
+            return false
+        }
+
+        // Keep floating-panel Enter behaviour unchanged (OK button path).
+        guard searchField.window !== floatingFindPanel else {
+            return false
+        }
+
+        currentFindQuery = searchField.stringValue
+        syncFindControlsFromState()
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: false, shouldRunSearch: false)
+
+        if let hostWindow = window {
+            NotificationCenter.default.post(
+                name: .quickMarkdownViewerFindCommand,
+                object: hostWindow,
+                userInfo: [
+                    QuickMarkdownViewerFindCommandUserInfoKey.command.rawValue:
+                        QuickMarkdownViewerFindCommand.findNext.rawValue
+                ]
+            )
+        }
+        return true
+    }
+
     func controlTextDidChange(_ notification: Notification) {
         guard let searchField = notification.object as? NSSearchField else {
             return

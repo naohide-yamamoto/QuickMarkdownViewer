@@ -140,8 +140,9 @@ You are responsible for reviewing, building, and using the software at your own 
 
 - Native macOS Help Viewer integration currently fails on some systems with the message 'The selected content is currently unavailable', even when Help-book registration calls report success.
 - Current practical behaviour: `Help > Quick Markdown Viewer Help` opens bundled in-app Help content directly instead of relying on Help Viewer page loading.
-- Native toolbar customisation has one deferred behaviour gap:
+- Native toolbar customisation has deferred behaviour gaps:
   - Right-clicking an existing toolbar item may not show `Remove Item`, even though `View > Customise Toolbar…` still supports removing items.
+  - `Flexible Space` may not visibly resize with window width changes in some toolbar layouts. This behaviour is also seen in Apple's Preview on the same macOS version and is currently treated as system-level/AppKit style interaction.
 
 ## Troubleshooting
 

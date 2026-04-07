@@ -534,7 +534,11 @@ struct DocumentWindowView: View {
     }
 
     /// Runs a Find operation against rendered HTML in the web view.
-    private func runFind(direction: MarkdownFindDirection, shouldBeepOnNoMatch: Bool) {
+    private func runFind(
+        direction: MarkdownFindDirection,
+        shouldBeepOnNoMatch: Bool,
+        completion: ((Bool) -> Void)? = nil
+    ) {
         let trimmedQuery = findQuery.trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !trimmedQuery.isEmpty else {
@@ -544,6 +548,7 @@ struct DocumentWindowView: View {
             if shouldBeepOnNoMatch {
                 NSSound.beep()
             }
+            completion?(false)
             return
         }
 
@@ -559,6 +564,8 @@ struct DocumentWindowView: View {
                 if !found, shouldBeepOnNoMatch {
                     NSSound.beep()
                 }
+
+                completion?(found)
             }
         }
     }

@@ -276,11 +276,14 @@ own risk.
   - Current status: Help-book registration and anchor-dispatch logs can still report success while Help Viewer fails to render content.
   - Current workaround implemented in-app: the Help menu command opens bundled in-app Help content directly.
   - Future work: revisit Apple Help Book rendering path and restore reliable native Help Viewer page loading.
-- Native toolbar customisation behaviour still has one deferred issue.
+- Native toolbar customisation behaviour still has deferred issues.
   - Symptom: right-clicking an existing toolbar item may not show `Remove Item`.
   - Current status: this issue persists after multiple AppKit-side adjustments (`toggleToolbarShown`, item-group tuning, and toolbar item navigation flags).
   - Current workaround: users can still remove/rearrange toolbar items via `View > Customise Toolbar…`.
-  - Future work: revisit toolbar implementation details (especially grouped-item composition) in a dedicated post-v1.0.5 pass.
+  - Symptom: `Flexible Space` may not visibly expand/contract with window width changes in some toolbar layouts.
+  - Current status: observed in Quick Markdown Viewer and also in Preview (v11.0 on macOS 26.3.1), suggesting AppKit/system-style behaviour rather than app-specific layout logic.
+  - Current workaround: if fixed-width spacing is needed, users can insert multiple `Space` items in toolbar customisation.
+  - Future work: revisit toolbar implementation details (especially grouped-item composition and style interactions) in a dedicated post-v1.0.5 pass.
 
 ## Notes
 
