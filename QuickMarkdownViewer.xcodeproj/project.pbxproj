@@ -11,7 +11,7 @@
 		29070A53CB39BCF06901CD77 /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1DF753E31D2BF175657B269B /* Cocoa.framework */; };
 		2F4CC94DB9A2BE7B30C6FEE6 /* MarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF19F49898BA9D9441B4250 /* MarkdownDocument.swift */; };
 		30514FE0ED3356BEEA46E0B6 /* index.html in Resources */ = {isa = PBXBuildFile; fileRef = F1123461ADEF13A626C0E32A /* index.html */; };
-		360FAE67AD3F5233EE0FC150 /* PlainMarkApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCEC735A3F967661A2E0244 /* PlainMarkApp.swift */; };
+		360FAE67AD3F5233EE0FC150 /* QuickMarkdownViewerApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BCEC735A3F967661A2E0244 /* QuickMarkdownViewerApp.swift */; };
 		3A0318AB9A8472A32AB284E6 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8069D8D6286D8E912E0DF908 /* Logger.swift */; };
 		527F3250262D42D1859682EA /* LinkRoutingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8084ECA26DFB3C8EC61A0A /* LinkRoutingService.swift */; };
 		5A0EDD1ECA852231DE2A2232 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0829A8E7B15ABEC09B47D7 /* AppCommands.swift */; };
@@ -41,7 +41,7 @@
 		0E072C69A46F3847DAEEB748 /* sample-image.png */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = image.png; path = "sample-image.png"; sourceTree = "<group>"; };
 		120F84613209A8F1FD1FB6B2 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		1DF753E31D2BF175657B269B /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
-		2BCEC735A3F967661A2E0244 /* PlainMarkApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PlainMarkApp.swift; sourceTree = "<group>"; };
+		2BCEC735A3F967661A2E0244 /* QuickMarkdownViewerApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickMarkdownViewerApp.swift; sourceTree = "<group>"; };
 		4ECE945D8E9788C02CE85191 /* FileOpenService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOpenService.swift; sourceTree = "<group>"; };
 		54DDECB006A9C322D26CE73C /* DocumentState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentState.swift; sourceTree = "<group>"; };
 		58746BFC47DA5AE169F4173C /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -184,7 +184,7 @@
 		D51F7192A1468E1501802B07 /* App */ = {
 			isa = PBXGroup;
 			children = (
-				2BCEC735A3F967661A2E0244 /* PlainMarkApp.swift */,
+				2BCEC735A3F967661A2E0244 /* QuickMarkdownViewerApp.swift */,
 				EF0829A8E7B15ABEC09B47D7 /* AppCommands.swift */,
 				606CAFED53527E465ED7F12B /* AppRouting.swift */,
 			);
@@ -307,7 +307,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				360FAE67AD3F5233EE0FC150 /* PlainMarkApp.swift in Sources */,
+				360FAE67AD3F5233EE0FC150 /* QuickMarkdownViewerApp.swift in Sources */,
 				5A0EDD1ECA852231DE2A2232 /* AppCommands.swift in Sources */,
 				EFD08600B21540E97E3EECD9 /* AppRouting.swift in Sources */,
 				2F4CC94DB9A2BE7B30C6FEE6 /* MarkdownDocument.swift in Sources */,
