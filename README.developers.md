@@ -8,6 +8,7 @@ It is designed to feel like Preview for Markdown:
 - No source pane and no editing UI
 
 Current release: `v1.0.4`.
+Current development target: `v1.0.5`.
 
 ## Contents
 
@@ -37,9 +38,13 @@ Quick Markdown Viewer v1 is intentionally minimal:
 - One document per window
 - File open, drag/drop, and Finder association
 - Native recent-documents menu (`File > Open Recent`)
+- Native file sharing (`File > Share` and toolbar Share item)
 - Rendered print and PDF export commands
 - View-source handoff to the system default plain-text editor
-- Native top document bar (open, zoom, appearance, find)
+- Native speech controls (`Edit > Speech`)
+- Native customisable AppKit toolbar (`NSToolbar`) with persisted item layout/display mode
+- Toolbar hide/show (`⌥⌘T`) and toolbar customisation (`View > Customise Toolbar…`)
+- Compact native Find panel when toolbar search is unavailable (for example, toolbar hidden)
 
 ## Non-goals
 
@@ -293,11 +298,16 @@ own risk.
 - File commands:
   - `⌘O` opens a Markdown file.
   - `File > Open Recent` opens recently viewed Markdown files.
+  - `File > Share` opens native macOS sharing services for the current file.
   - `⌘P` prints rendered Markdown content.
   - `File > Export as PDF…` exports rendered Markdown content as PDF.
   - `File > View Source` opens the raw `.md` in the system default plain-text editor.
+- Speech commands:
+  - `Edit > Speech > Start Speaking` reads selected text, or full document text if nothing is selected.
+  - `Edit > Speech > Stop Speaking` stops active speech for the current window.
 - In-document search shortcuts:
-  - `⌘F` toggles the Find bar.
+  - `⌘F` focuses toolbar search when toolbar search is available.
+  - With toolbar hidden (or Search shown as text-only action), `⌘F` opens a compact native Find panel.
   - `⌘G` moves to the next match.
   - `Shift+⌘G` moves to the previous match.
   - `⌘E` uses current selection for Find.
@@ -312,6 +322,9 @@ own risk.
   - Trackpad smart magnify (two-finger double tap) follows the same one-way zoom-to-fit behaviour as `⌘9`.
 - Appearance shortcut:
   - `Shift+⌘L` toggles light/dark mode.
+- Toolbar commands:
+  - `⌥⌘T` toggles toolbar visibility.
+  - `View > Customise Toolbar…` opens native drag/drop toolbar customisation.
 - In sandboxed Release builds, Quick Markdown Viewer may ask once for folder access when a document contains local relative image/link paths and macOS did not grant sibling-file scope from the initial file selection; granted folders are remembered via security-scoped bookmarks.
 - Markdown rendering behaviour is designed for reading, not editing.
 

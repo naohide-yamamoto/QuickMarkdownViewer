@@ -6,6 +6,27 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+- Native `File > Share` submenu with macOS share services for the active Markdown file.
+- Native `Edit > Speech` submenu with `Start Speaking` and `Stop Speaking`.
+- Native customisable AppKit toolbar (`NSToolbar`) with:
+  - right-click display modes (`Icon and Text`, `Icon Only`, `Text Only`)
+  - `View > Customise Toolbar…` drag-and-drop customisation
+  - additional toolbar items (`Share`, `View Source`, `Zoom to Fit`, `Actual Size`, `Zoom Out/In`, `Print`, `Export as PDF`, `Space`, `Flexible Space`)
+- `View > Hide Toolbar` / `Show Toolbar` (`⌥⌘T`).
+
+### Changed
+- `⌘F` now adapts to toolbar state:
+  - with toolbar search available, it focuses toolbar Search
+  - with toolbar hidden (or Search represented as a text-only action), it opens the compact native Find panel
+- Search UI wording updated to `Search` in toolbar/find controls.
+- Empty-window wording updated to use macOS-standard `toolbar` terminology.
+- First-document open path now prewarms WebKit, reuses the initial empty window when possible, and reveals content immediately at `WKWebView didFinish`.
+
+### Fixed
+- Improved toolbar show/hide transition behaviour by removing flash/wiggle while preserving overall window size.
+- Stabilised initial `zoom-to-fit` timing to remove intermittent first-open fit spikes.
+
 ## [1.0.4] - 2026-03-30
 
 ### Added

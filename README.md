@@ -79,11 +79,15 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 
 - Read-only Markdown viewing (no editing surface).
 - One document per window.
+- Native customisable macOS toolbar with persisted layout/display mode.
 - File open from:
   - double-click in Finder (when associated)
   - `File > Open` (`⌘O`)
   - drag and drop
   - `File > Open Recent`
+- Native file sharing:
+  - `File > Share` submenu
+  - toolbar `Share` button
 - External links open in your default browser or mail app.
 - Local Markdown links open in a new Quick Markdown Viewer window.
 - Relative local images are rendered from the document folder.
@@ -91,14 +95,20 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
   - `⌘F` find
   - `⌘G` next
   - `Shift+⌘G` previous
+  - `⌘E` use selection for find
+  - `⌘J` jump to selection
   - case-insensitive and case-sensitive modes
+- With the toolbar hidden, `⌘F` opens a compact native find panel with the same query/mode state as toolbar search.
 - Zoom controls:
   - zoom in/out
   - actual size (100%)
   - zoom to fit
+- `View > Hide Toolbar` / `Show Toolbar` (`⌥⌘T`) and `View > Customise Toolbar…`.
+- Toolbar customisation supports drag/drop rearrangement, `Space`, and `Flexible Space`.
 - Light/dark mode toggle.
 - Print rendered Markdown (`⌘P`).
 - Export rendered Markdown as PDF.
+- Native speech controls under `Edit > Speech` (`Start Speaking` / `Stop Speaking`).
 - View raw source in your default plain-text editor.
 
 ## Keyboard Shortcuts
@@ -107,9 +117,14 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - `⌘F`: find in document
 - `⌘G`: find next
 - `Shift+⌘G`: find previous
+- `⌘E`: use selection for find
+- `⌘J`: jump to selection
 - `⌘P`: print
+- `⌘=`: zoom in
+- `⌘-`: zoom out
 - `⌘0`: actual size (100%)
 - `⌘9`: zoom to fit
+- `⌥⌘T`: hide/show toolbar
 - `Shift+⌘L`: toggle light/dark mode
 
 ## Licence
