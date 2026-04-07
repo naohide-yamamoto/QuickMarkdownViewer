@@ -276,10 +276,9 @@ own risk.
   - Current status: Help-book registration and anchor-dispatch logs can still report success while Help Viewer fails to render content.
   - Current workaround implemented in-app: the Help menu command opens bundled in-app Help content directly.
   - Future work: revisit Apple Help Book rendering path and restore reliable native Help Viewer page loading.
-- Native toolbar customisation behaviour still has two deferred issues.
-  - Symptom: after at least one show/hide cycle, hiding the toolbar can briefly flash toolbar contents (for example, the window title text and toolbar controls/icons).
+- Native toolbar customisation behaviour still has one deferred issue.
   - Symptom: right-clicking an existing toolbar item may not show `Remove Item`.
-  - Current status: both issues persist after multiple AppKit-side adjustments (`toggleToolbarShown`, item-group tuning, and toolbar item navigation flags).
+  - Current status: this issue persists after multiple AppKit-side adjustments (`toggleToolbarShown`, item-group tuning, and toolbar item navigation flags).
   - Current workaround: users can still remove/rearrange toolbar items via `View > Customise Toolbar…`.
   - Future work: revisit toolbar implementation details (especially grouped-item composition) in a dedicated post-v1.0.5 pass.
 

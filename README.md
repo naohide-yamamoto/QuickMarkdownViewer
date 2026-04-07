@@ -140,8 +140,7 @@ You are responsible for reviewing, building, and using the software at your own 
 
 - Native macOS Help Viewer integration currently fails on some systems with the message 'The selected content is currently unavailable', even when Help-book registration calls report success.
 - Current practical behaviour: `Help > Quick Markdown Viewer Help` opens bundled in-app Help content directly instead of relying on Help Viewer page loading.
-- Toolbar customisation has two known native-behaviour gaps that are currently deferred:
-  - On some systems, hiding the toolbar after at least one hide/show cycle can briefly flash toolbar contents (for example, the window title text and toolbar controls/icons).
+- Native toolbar customisation has one deferred behaviour gap:
   - Right-clicking an existing toolbar item may not show `Remove Item`, even though `View > Customise Toolbar…` still supports removing items.
 
 ## Troubleshooting

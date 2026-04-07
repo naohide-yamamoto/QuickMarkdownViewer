@@ -794,7 +794,7 @@ final class AppRouting: ObservableObject {
         let initialFrame = NSRect(x: 0, y: 0, width: 940, height: 760)
         let window = NSWindow(
             contentRect: initialFrame,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -983,7 +983,7 @@ final class AppRouting: ObservableObject {
         let initialFrame = NSRect(x: 0, y: 0, width: 940, height: 760)
         let window = NSWindow(
             contentRect: initialFrame,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
@@ -1477,6 +1477,9 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     /// True when the next toolbar display-mode callback should be ignored.
     private var ignoreNextDisplayModeChange = false
 
+    /// Deadline used to suppress search-item rebuilds around toolbar toggles.
+    private var suppressSearchItemRebuildUntil = Date.distantPast
+
     /// Managed native toolbar for this window.
     private weak var managedToolbar: NSToolbar?
 
@@ -1641,11 +1644,13 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
 
         isTogglingToolbarVisibility = true
         ignoreNextDisplayModeChange = true
+        suppressSearchItemRebuildUntil = Date().addingTimeInterval(1.0)
 
         if toolbar.isVisible {
             closeFloatingFindPanel()
         }
         window.toggleToolbarShown(nil)
+
         DispatchQueue.main.async {
             AppRouting.shared.notifyToolbarVisibilityDidChange()
         }
@@ -1698,11 +1703,15 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         }
 
         window.toolbar = toolbar
-        window.toolbarStyle = .unified
+        window.toolbarStyle = .automatic
         managedToolbar = toolbar
 
         toolbar.onDisplayModeChanged = { [weak self] toolbar in
             guard let self else {
+                return
+            }
+
+            guard Date() >= self.suppressSearchItemRebuildUntil else {
                 return
             }
 
@@ -1908,14 +1917,6 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         }
 
         return NSImage(size: NSSize(width: 16, height: 16))
-    }
-
-    /// Applies consistent toolbar-item behaviour for customisation menus.
-    private func preparedToolbarItem<T: NSToolbarItem>(_ item: T) -> T {
-        if #available(macOS 13.0, *) {
-            item.isNavigational = false
-        }
-        return item
     }
 
     /// Creates one native Find menu template used by search fields.
@@ -2428,10 +2429,6 @@ extension DocumentWindowController: NSToolbarDelegate {
         Self.allowedToolbarItemIdentifiers
     }
 
-    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        []
-    }
-
     func toolbar(
         _ toolbar: NSToolbar,
         itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
@@ -2446,7 +2443,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Open")
             item.target = self
             item.action = #selector(openDocumentFromToolbar(_:))
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.zoomLegacy:
             let group = NSToolbarItemGroup(
@@ -2469,7 +2466,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 zoomLegacyGroupItem = group
             }
-            return preparedToolbarItem(group)
+            return group
 
         case ToolbarItemIdentifier.appearance:
             let group = NSToolbarItemGroup(
@@ -2491,7 +2488,7 @@ extension DocumentWindowController: NSToolbarDelegate {
                 appearanceGroupItem = group
             }
             refreshAppearanceSelection()
-            return preparedToolbarItem(group)
+            return group
 
         case ToolbarItemIdentifier.printExportGroup:
             let group = NSToolbarItemGroup(
@@ -2513,7 +2510,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 printExportGroupItem = group
             }
-            return preparedToolbarItem(group)
+            return group
 
         case ToolbarItemIdentifier.search:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -2532,7 +2529,7 @@ extension DocumentWindowController: NSToolbarDelegate {
                     searchToolbarGenericItem = item
                 }
 
-                return preparedToolbarItem(item)
+                return item
             }
 
             let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 220, height: 0))
@@ -2557,7 +2554,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             }
 
             syncFindControlsFromState()
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.share:
             let item = NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)
@@ -2570,7 +2567,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 shareToolbarItem = item
             }
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.viewSource:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -2584,7 +2581,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 viewSourceToolbarItem = item
             }
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.zoomToFit:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -2601,7 +2598,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 zoomToFitToolbarItem = item
             }
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.actualSize:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -2615,7 +2612,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 actualSizeToolbarItem = item
             }
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.zoomOutIn:
             let group = NSToolbarItemGroup(
@@ -2637,7 +2634,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 zoomOutInGroupItem = group
             }
-            return preparedToolbarItem(group)
+            return group
 
         case ToolbarItemIdentifier.print:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -2651,7 +2648,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 printToolbarItem = item
             }
-            return preparedToolbarItem(item)
+            return item
 
         case ToolbarItemIdentifier.exportPDF:
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
@@ -2668,7 +2665,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             if flag {
                 exportPDFToolbarItem = item
             }
-            return preparedToolbarItem(item)
+            return item
 
         default:
             return nil
