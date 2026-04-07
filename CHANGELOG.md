@@ -6,6 +6,8 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+## [1.0.5] - 2026-04-07
+
 ### Added
 - Native `File > Share` submenu with macOS share services for the active Markdown file.
 - Native `Edit > Speech` submenu with `Start Speaking` and `Stop Speaking`.
@@ -16,6 +18,11 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 - `View > Hide Toolbar` / `Show Toolbar` (`⌥⌘T`).
 
 ### Changed
+- App version metadata:
+  - `MARKETING_VERSION = 1.0.5`
+  - `CURRENT_PROJECT_VERSION = 6`
+  - `CFBundleShortVersionString = 1.0.5`
+  - `CFBundleVersion = 6`
 - `⌘F` now adapts to toolbar state:
   - with toolbar search available, it focuses toolbar Search
   - with toolbar hidden (or Search represented as a text-only action), it opens the compact native Find panel
