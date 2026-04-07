@@ -78,6 +78,12 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
     /// during fast live-resize interactions on tiny window widths.
     private let minimumFitWidthPoints: CGFloat = 120
 
+    /// Default maximum content-column width from bundled reader stylesheet.
+    ///
+    /// Keep this in sync with `.content { width: min(100%, 840px); }` in
+    /// `QuickMarkdownViewer/Web/styles.css`.
+    private let defaultContentColumnMaximumWidthPoints: CGFloat = 840
+
     /// Whether fit mode is currently active for this web view.
     ///
     /// Fit mode becomes active after a successful `Cmd+9`/smart-fit action and
@@ -1413,6 +1419,31 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
         }
     }
 
+    /// Fast initial-fit path using bundled stylesheet geometry (no JS measure).
+    ///
+    /// This removes sporadic first-open outliers caused by synchronous layout
+    /// metric reads while preserving the same fit target as the default style.
+    @discardableResult
+    func zoomToFitWidthUsingDefaultColumnLayoutIfPossible() -> Bool {
+        guard let webView else {
+            return false
+        }
+
+        let viewWidthPoints = webView.bounds.width
+        guard viewWidthPoints > 0 else {
+            return false
+        }
+
+        let baselineContentWidthPoints = min(viewWidthPoints, defaultContentColumnMaximumWidthPoints)
+        guard baselineContentWidthPoints > 0 else {
+            return false
+        }
+
+        fitBaselineContentWidthPoints = baselineContentWidthPoints
+        isZoomToFitModeEnabled = true
+        return applyFitUsingBaseline(on: webView)
+    }
+
     /// Re-applies fit after a window-size change when fit mode is active.
     ///
     /// This is called by the coordinator on `NSWindow.didResizeNotification`.
@@ -1576,6 +1607,11 @@ struct MarkdownWebView: NSViewRepresentable {
         if context.coordinator.lastLoadedFingerprint != fingerprint {
             context.coordinator.lastLoadedFingerprint = fingerprint
             context.coordinator.shouldApplyInitialZoomToFitOnNextDidFinish = true
+            context.coordinator.prepareForLoadTransition(on: webView)
+            context.coordinator.lastHTMLLoadStartedAt = DispatchTime.now()
+            Logger.info(
+                "[PERF] webview-load-start file=\(documentURL.lastPathComponent) htmlBytes=\(html.utf8.count)"
+            )
             searchBridge.invalidateZoomToFitCache()
             webView.loadHTMLString(html, baseURL: baseURL)
         }
@@ -1598,11 +1634,17 @@ struct MarkdownWebView: NSViewRepresentable {
         /// Fingerprint of last loaded HTML to avoid unnecessary reloads.
         var lastLoadedFingerprint = ""
 
+        /// Start timestamp for the most recent `loadHTMLString` call.
+        var lastHTMLLoadStartedAt: DispatchTime?
+
         /// One-shot flag to auto-apply fit right after fresh document load.
         ///
         /// This keeps initial document presentation consistent with the default
         /// fit-mode behaviour expected by this viewer.
         var shouldApplyInitialZoomToFitOnNextDidFinish = false
+
+        /// One-shot flag to fade in content after each newly started HTML load.
+        private var shouldRevealAfterNextLoad = false
 
         /// Weak reference to the currently monitored web view instance.
         private weak var monitoredWebView: WKWebView?
@@ -1837,16 +1879,90 @@ struct MarkdownWebView: NSViewRepresentable {
         /// This makes newly opened documents immediately fit the window without
         /// requiring the user to press `Cmd+9` first.
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            if let loadStart = lastHTMLLoadStartedAt {
+                let loadMilliseconds = elapsedMilliseconds(since: loadStart)
+                Logger.info(
+                    "[PERF] webview-didFinish file=\(currentDocumentURL?.lastPathComponent ?? "unknown") ms=\(formatMilliseconds(loadMilliseconds))"
+                )
+                lastHTMLLoadStartedAt = nil
+            }
+
+            // Reveal as soon as WebKit signals load completion so first-open
+            // feels responsive even if fit-mode adjustment takes longer.
+            revealAfterLoadIfNeeded(on: webView)
+
             guard shouldApplyInitialZoomToFitOnNextDidFinish else {
                 return
             }
 
             shouldApplyInitialZoomToFitOnNextDidFinish = false
-            searchBridge?.zoomToFitWidth { success in
-                if !success {
-                    Logger.error("Initial zoom-to-fit after document load failed.")
+            DispatchQueue.main.async {
+                let fitStart = DispatchTime.now()
+                if self.searchBridge?.zoomToFitWidthUsingDefaultColumnLayoutIfPossible() == true {
+                    let fitMilliseconds = self.elapsedMilliseconds(since: fitStart)
+                    Logger.info(
+                        "[PERF] initial-fit file=\(self.currentDocumentURL?.lastPathComponent ?? "unknown") success=true ms=\(self.formatMilliseconds(fitMilliseconds))"
+                    )
+                    return
+                }
+
+                self.searchBridge?.zoomToFitWidth { success in
+                    let fitMilliseconds = self.elapsedMilliseconds(since: fitStart)
+                    Logger.info(
+                        "[PERF] initial-fit file=\(self.currentDocumentURL?.lastPathComponent ?? "unknown") success=\(success) ms=\(self.formatMilliseconds(fitMilliseconds))"
+                    )
+                    if !success {
+                        Logger.error("Initial zoom-to-fit after document load failed.")
+                    }
                 }
             }
+        }
+
+        /// Restores visible content if a navigation fails before completion.
+        func webView(
+            _ webView: WKWebView,
+            didFail navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            shouldRevealAfterNextLoad = false
+            webView.alphaValue = 1.0
+        }
+
+        /// Restores visible content if provisional navigation fails.
+        func webView(
+            _ webView: WKWebView,
+            didFailProvisionalNavigation navigation: WKNavigation!,
+            withError error: Error
+        ) {
+            shouldRevealAfterNextLoad = false
+            webView.alphaValue = 1.0
+        }
+
+        /// Prepares the web view for a smoother first paint during fresh loads.
+        func prepareForLoadTransition(on webView: WKWebView) {
+            shouldRevealAfterNextLoad = true
+            webView.alphaValue = 0.0
+        }
+
+        /// Performs a short fade-in once loaded content is ready for display.
+        private func revealAfterLoadIfNeeded(on webView: WKWebView) {
+            guard shouldRevealAfterNextLoad else {
+                return
+            }
+
+            shouldRevealAfterNextLoad = false
+            webView.alphaValue = 1.0
+        }
+
+        /// Returns elapsed wall-clock time in milliseconds for profiling logs.
+        private func elapsedMilliseconds(since start: DispatchTime) -> Double {
+            let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+            return Double(elapsedNanoseconds) / 1_000_000
+        }
+
+        /// Formats elapsed millisecond values for compact console logs.
+        private func formatMilliseconds(_ milliseconds: Double) -> String {
+            String(format: "%.1f", milliseconds)
         }
 
         /// Called when the dedicated WebContent process crashes or is killed.
@@ -1854,6 +1970,8 @@ struct MarkdownWebView: NSViewRepresentable {
         /// We only log here for now; keeping behaviour minimal avoids masking
         /// the root cause while still surfacing useful diagnostics in Xcode.
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+            shouldRevealAfterNextLoad = false
+            webView.alphaValue = 1.0
             Logger.error("WKWebView WebContent process terminated unexpectedly.")
         }
     }

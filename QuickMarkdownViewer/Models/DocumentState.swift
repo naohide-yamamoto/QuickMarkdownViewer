@@ -70,6 +70,7 @@ final class DocumentState: ObservableObject {
         fileOpenService: FileOpenService,
         renderService: MarkdownRenderService
     ) {
+        let loadStart = DispatchTime.now()
         phase = .loading
 
         // Reset any prior scoped access before loading a new file.
@@ -93,33 +94,44 @@ final class DocumentState: ObservableObject {
 
         do {
             // 1) Read source text from disk.
+            let readStart = DispatchTime.now()
             var opened = try fileOpenService.openDocument(at: fileURL)
+            let readMilliseconds = elapsedMilliseconds(since: readStart)
+
+            var directoryAccessPromptMilliseconds: Double?
 
             // In sandboxed builds, selecting a file may not always grant scope
             // to sibling files in the same folder. If the Markdown appears to
             // reference local relative resources, ask once for folder access.
             if SecurityHelpers.isRunningSandboxed,
                !scopedSession.hasActiveAccess(to: documentDirectoryURL),
-               containsLikelyRelativeLocalReferences(in: opened.rawMarkdown),
-               let grantedDirectoryURL = requestDirectoryAccess(
-                   preferredDirectoryURL: documentDirectoryURL,
-                   fileName: fileURL.lastPathComponent
-               ) {
-                // Recreate the session so both the file and granted directory
-                // stay in scope while this document window remains open.
-                SecurityScopedBookmarkStore.shared.storeBookmark(for: grantedDirectoryURL)
-                scopedSession.stop()
-                scopedSession = SecurityScopedSession(
-                    urls: [fileURL, documentDirectoryURL, grantedDirectoryURL]
+               containsLikelyRelativeLocalReferences(in: opened.rawMarkdown) {
+                let directoryAccessPromptStart = DispatchTime.now()
+                let grantedDirectoryURL = requestDirectoryAccess(
+                    preferredDirectoryURL: documentDirectoryURL,
+                    fileName: fileURL.lastPathComponent
                 )
-                securityScopedSession = scopedSession
+                directoryAccessPromptMilliseconds = elapsedMilliseconds(since: directoryAccessPromptStart)
+
+                if let grantedDirectoryURL {
+                    // Recreate the session so both the file and granted directory
+                    // stay in scope while this document window remains open.
+                    SecurityScopedBookmarkStore.shared.storeBookmark(for: grantedDirectoryURL)
+                    scopedSession.stop()
+                    scopedSession = SecurityScopedSession(
+                        urls: [fileURL, documentDirectoryURL, grantedDirectoryURL]
+                    )
+                    securityScopedSession = scopedSession
+                }
             }
 
             // 2) Render Markdown to a full HTML document.
+            let renderStart = DispatchTime.now()
             let rendered = try renderService.render(
                 markdown: opened.rawMarkdown,
                 baseDirectoryURL: opened.baseDirectoryURL
             )
+            let renderMilliseconds = elapsedMilliseconds(since: renderStart)
 
             // 3) Publish successful state to the UI.
             opened.renderedHTML = rendered
@@ -127,6 +139,19 @@ final class DocumentState: ObservableObject {
             html = rendered
             lastLoadedFingerprint = currentFileFingerprint(for: fileURL)
             phase = .loaded
+
+            let totalMilliseconds = elapsedMilliseconds(since: loadStart)
+            let directoryAccessPromptComponent: String
+            if let directoryAccessPromptMilliseconds {
+                directoryAccessPromptComponent =
+                    " directoryPromptMs=\(formatMilliseconds(directoryAccessPromptMilliseconds))"
+            } else {
+                directoryAccessPromptComponent = ""
+            }
+
+            Logger.info(
+                "[PERF] document-state-load file=\(fileURL.lastPathComponent) outcome=success readMs=\(formatMilliseconds(readMilliseconds)) renderMs=\(formatMilliseconds(renderMilliseconds)) totalMs=\(formatMilliseconds(totalMilliseconds))\(directoryAccessPromptComponent)"
+            )
         } catch {
             // Fall back to a clean error state without crashing.
             document = nil
@@ -135,6 +160,10 @@ final class DocumentState: ObservableObject {
             securityScopedSession?.stop()
             securityScopedSession = nil
             lastLoadedFingerprint = nil
+            let totalMilliseconds = elapsedMilliseconds(since: loadStart)
+            Logger.info(
+                "[PERF] document-state-load file=\(fileURL.lastPathComponent) outcome=failure totalMs=\(formatMilliseconds(totalMilliseconds))"
+            )
             Logger.error("Failed to load document: \(error.localizedDescription)")
         }
     }
@@ -194,6 +223,17 @@ final class DocumentState: ObservableObject {
             modificationDate: modificationDate,
             fileSize: fileSize
         )
+    }
+
+    /// Returns elapsed wall-clock time in milliseconds for profiling logs.
+    private func elapsedMilliseconds(since start: DispatchTime) -> Double {
+        let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        return Double(elapsedNanoseconds) / 1_000_000
+    }
+
+    /// Formats elapsed millisecond values for compact console logs.
+    private func formatMilliseconds(_ milliseconds: Double) -> String {
+        String(format: "%.1f", milliseconds)
     }
 
     /// Returns true when Markdown appears to contain local file references.

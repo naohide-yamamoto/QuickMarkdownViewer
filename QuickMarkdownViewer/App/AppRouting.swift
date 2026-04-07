@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import WebKit
 
 /// Notification posted when the app-level Find commands should act on a window.
 extension Notification.Name {
@@ -167,6 +168,7 @@ final class QuickMarkdownViewerAppDelegate: NSObject, NSApplicationDelegate {
     /// Finalises launch state and opens an empty window only when needed.
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppRouting.shared.applyPersistedAppearanceMode()
+        AppRouting.shared.prewarmWebViewIfNeeded()
         didFinishLaunching = true
         flushPendingFilesIfNeeded()
         retargetMainMenuDocumentActionsIfNeeded()
@@ -353,6 +355,67 @@ final class QuickMarkdownViewerAppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+/// One-shot hidden `WKWebView` warmup to reduce first-document latency.
+@MainActor
+private final class WebViewPrewarmer: NSObject, WKNavigationDelegate {
+    /// Retained hidden web view while warmup is in progress.
+    private var prewarmWebView: WKWebView?
+
+    /// Ensures prewarm executes at most once per app run.
+    private var hasStarted = false
+
+    /// Starts prewarming WebKit/WebContent process state once.
+    func prewarmIfNeeded() {
+        guard !hasStarted else {
+            return
+        }
+        hasStarted = true
+
+        let configuration = WKWebViewConfiguration()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.navigationDelegate = self
+        prewarmWebView = webView
+
+        Logger.info("[PERF] webview-prewarm-start")
+        webView.loadHTMLString(
+            """
+            <!doctype html>
+            <html><head><meta charset="utf-8"></head><body></body></html>
+            """,
+            baseURL: nil
+        )
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        Logger.info("[PERF] webview-prewarm-finish")
+        releasePrewarmWebView()
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        Logger.error("WKWebView prewarm failed: \(error.localizedDescription)")
+        releasePrewarmWebView()
+    }
+
+    func webView(
+        _ webView: WKWebView,
+        didFailProvisionalNavigation navigation: WKNavigation!,
+        withError error: Error
+    ) {
+        Logger.error("WKWebView prewarm provisional failure: \(error.localizedDescription)")
+        releasePrewarmWebView()
+    }
+
+    /// Releases temporary warmup state once the one-shot load completes.
+    private func releasePrewarmWebView() {
+        prewarmWebView?.stopLoading()
+        prewarmWebView?.navigationDelegate = nil
+        prewarmWebView = nil
+    }
+}
+
 /// Main app router responsible for opening files and creating document windows.
 @MainActor
 final class AppRouting: ObservableObject {
@@ -403,6 +466,9 @@ final class AppRouting: ObservableObject {
     /// Service that renders Markdown into a complete HTML document string.
     private let renderService = MarkdownRenderService()
 
+    /// One-shot runtime prewarmer for initial `WKWebView` startup overhead.
+    private let webViewPrewarmer = WebViewPrewarmer()
+
     /// Thin wrapper over native macOS "Recent Documents" behaviour.
     private let recentDocumentService = RecentDocumentService()
 
@@ -451,6 +517,11 @@ final class AppRouting: ObservableObject {
     func openDocumentPanel() {
         guard let urls = fileOpenService.selectMarkdownFiles() else { return }
         openFiles(urls)
+    }
+
+    /// Runs one-time hidden `WKWebView` warmup after launch.
+    func prewarmWebViewIfNeeded() {
+        webViewPrewarmer.prewarmIfNeeded()
     }
 
     /// Opens the app's registered Apple Help Book.
@@ -870,12 +941,86 @@ final class AppRouting: ObservableObject {
             return
         }
 
+        if reuseInitialEmptyWindowIfPossible(for: standardisedFileURL) {
+            return
+        }
+
         // Dismiss any visible empty launch windows before opening a real
         // document so the app behaves like Preview (document-first) rather
         // than leaving an empty placeholder window behind.
-        closeInitialEmptyWindowsIfPresent()
+        let emptyWindowCloseStart = DispatchTime.now()
+        let closedEmptyWindowCount = closeInitialEmptyWindowsIfPresent()
+        let emptyWindowCloseMilliseconds = elapsedMilliseconds(since: emptyWindowCloseStart)
+        Logger.info(
+            "[PERF] empty-window-close file=\(standardisedFileURL.lastPathComponent) closed=\(closedEmptyWindowCount) ms=\(formatMilliseconds(emptyWindowCloseMilliseconds))"
+        )
 
         showDocumentWindow(for: standardisedFileURL)
+    }
+
+    /// Reuses an existing empty launch window as the first document window.
+    ///
+    /// This avoids close-and-create transition work that can cause visible
+    /// flashing and extra latency on first document open after app launch.
+    private func reuseInitialEmptyWindowIfPossible(for fileURL: URL) -> Bool {
+        guard let emptyController = reusableInitialEmptyWindowController() else {
+            return false
+        }
+
+        if let reusedWindow = emptyController.window {
+            let closeOthersStart = DispatchTime.now()
+            let closedOtherEmptyWindows = closeInitialEmptyWindowsIfPresent(excluding: reusedWindow)
+            let closeOthersMilliseconds = elapsedMilliseconds(since: closeOthersStart)
+            Logger.info(
+                "[PERF] empty-window-close file=\(fileURL.lastPathComponent) closed=\(closedOtherEmptyWindows) ms=\(formatMilliseconds(closeOthersMilliseconds))"
+            )
+        }
+
+        let reuseStart = DispatchTime.now()
+        let didLoadDocument = emptyController.openDocumentInCurrentWindow(fileURL: fileURL)
+        let reuseMilliseconds = elapsedMilliseconds(since: reuseStart)
+        Logger.info(
+            "[PERF] empty-window-reuse file=\(fileURL.lastPathComponent) success=\(didLoadDocument) ms=\(formatMilliseconds(reuseMilliseconds))"
+        )
+
+        if didLoadDocument {
+            recentDocumentService.note(fileURL)
+            notifyRecentDocumentsChanged()
+        }
+
+        if let reusedWindow = emptyController.window {
+            if reusedWindow.isMiniaturized {
+                reusedWindow.deminiaturize(nil)
+            }
+            reusedWindow.makeKeyAndOrderFront(nil)
+        }
+
+        return true
+    }
+
+    /// Returns a visible empty launch-window controller that can be repurposed.
+    private func reusableInitialEmptyWindowController() -> DocumentWindowController? {
+        let candidates = windowControllers.values.filter { controller in
+            guard let window = controller.window else {
+                return false
+            }
+
+            return window.isVisible &&
+                window.styleMask.contains(.titled) &&
+                window.representedURL == nil &&
+                window.title == "Quick Markdown Viewer"
+        }
+
+        guard !candidates.isEmpty else {
+            return nil
+        }
+
+        if let keyWindow = NSApp.keyWindow,
+           let keyCandidate = candidates.first(where: { $0.window === keyWindow }) {
+            return keyCandidate
+        }
+
+        return candidates.first
     }
 
     /// Brings an already-open document window to the front when file matches.
@@ -958,6 +1103,8 @@ final class AppRouting: ObservableObject {
 
     /// Builds and displays a document window, then loads and renders content.
     private func showDocumentWindow(for fileURL: URL) {
+        let windowCreateStart = DispatchTime.now()
+
         // Each window owns its own document state object.
         let documentState = DocumentState(fileURL: fileURL)
 
@@ -1014,6 +1161,10 @@ final class AppRouting: ObservableObject {
 
         controller.showWindow(nil)
         window.makeKeyAndOrderFront(nil)
+        let windowCreateMilliseconds = elapsedMilliseconds(since: windowCreateStart)
+        Logger.info(
+            "[PERF] document-window-create file=\(fileURL.lastPathComponent) ms=\(formatMilliseconds(windowCreateMilliseconds))"
+        )
 
         // Keep launch behaviour aligned with Preview-style utilities:
         // no control (including the top search field) should be focused by
@@ -1033,10 +1184,15 @@ final class AppRouting: ObservableObject {
         }
 
         // Perform immediate load + render for fast perceived open time.
+        let documentLoadStart = DispatchTime.now()
         documentState.load(
             fileURL: fileURL,
             fileOpenService: fileOpenService,
             renderService: renderService
+        )
+        let documentLoadMilliseconds = elapsedMilliseconds(since: documentLoadStart)
+        Logger.info(
+            "[PERF] document-state-load-call file=\(fileURL.lastPathComponent) ms=\(formatMilliseconds(documentLoadMilliseconds))"
         )
 
         if let loadedDocument = documentState.document {
@@ -1221,21 +1377,35 @@ final class AppRouting: ObservableObject {
     /// The SwiftUI `WindowGroup` empty-state window is useful on normal launch
     /// with no files, but when a file-open event arrives we prefer a single
     /// document window experience with no empty placeholder left behind.
-    private func closeInitialEmptyWindowsIfPresent() {
+    @discardableResult
+    private func closeInitialEmptyWindowsIfPresent(excluding excludedWindow: NSWindow? = nil) -> Int {
         let emptyWindows = NSApp.windows.filter {
             $0.isVisible &&
             $0.styleMask.contains(.titled) &&
             $0.representedURL == nil &&
-            $0.title == "Quick Markdown Viewer"
+            $0.title == "Quick Markdown Viewer" &&
+            $0 !== excludedWindow
         }
 
         guard !emptyWindows.isEmpty else {
-            return
+            return 0
         }
 
         // Close all matching placeholders in case launch timing ever produced
         // more than one empty window. This keeps resulting behaviour tidy.
         emptyWindows.forEach { $0.close() }
+        return emptyWindows.count
+    }
+
+    /// Returns elapsed wall-clock time in milliseconds for lightweight profiling.
+    private func elapsedMilliseconds(since start: DispatchTime) -> Double {
+        let elapsedNanoseconds = DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds
+        return Double(elapsedNanoseconds) / 1_000_000
+    }
+
+    /// Formats elapsed millisecond values for compact console logs.
+    private func formatMilliseconds(_ milliseconds: Double) -> String {
+        String(format: "%.1f", milliseconds)
     }
 
     /// Returns the retained controller that owns a given window instance.
@@ -1603,6 +1773,43 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             fileOpenService: fileOpenService,
             renderService: renderService
         )
+    }
+
+    /// Reuses this existing window to open a document in-place.
+    ///
+    /// This is used to retarget the initial empty launch window into the first
+    /// real document window, avoiding a close/create transition flash.
+    @discardableResult
+    func openDocumentInCurrentWindow(fileURL: URL) -> Bool {
+        guard let window else {
+            return false
+        }
+
+        window.representedURL = fileURL
+        window.title = fileURL.lastPathComponent
+
+        let loadStart = DispatchTime.now()
+        documentState.load(
+            fileURL: fileURL,
+            fileOpenService: fileOpenService,
+            renderService: renderService
+        )
+        let loadMilliseconds =
+            Double(DispatchTime.now().uptimeNanoseconds - loadStart.uptimeNanoseconds) / 1_000_000
+        Logger.info(
+            "[PERF] document-state-load-call file=\(fileURL.lastPathComponent) ms=\(String(format: "%.1f", loadMilliseconds))"
+        )
+
+        if let loadedDocument = documentState.document {
+            window.title = loadedDocument.filename
+        }
+
+        refreshToolbarItemState()
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshToolbarItemState()
+        }
+
+        return documentState.document != nil
     }
 
     /// Handles Cmd+F behaviour for this window.
