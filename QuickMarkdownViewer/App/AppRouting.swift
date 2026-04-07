@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import SwiftUI
 
 /// Notification posted when the app-level Find commands should act on a window.
@@ -10,6 +11,9 @@ extension Notification.Name {
 
     /// Notification posted when document actions should act on a window.
     static let quickMarkdownViewerDocumentCommand = Notification.Name("QuickMarkdownViewer.DocumentCommand")
+
+    /// Notification posted when a document window publishes Find state updates.
+    static let quickMarkdownViewerFindStateDidChange = Notification.Name("QuickMarkdownViewer.FindStateDidChange")
 }
 
 /// Supported in-document Find actions for QuickMarkdownViewer windows.
@@ -18,9 +22,6 @@ extension Notification.Name {
 /// target the currently active document window without coupling AppCommands to
 /// any specific SwiftUI view instance.
 enum QuickMarkdownViewerFindCommand: String {
-    /// Show/hide the find bar in the active document window.
-    case toggleFindBar
-
     /// Move to the next match for the current search query.
     case findNext
 
@@ -35,6 +36,12 @@ enum QuickMarkdownViewerFindCommand: String {
 
     /// Hide the find bar while preserving the current query text.
     case hideFindBar
+
+    /// Updates the active Find query text.
+    case setFindQuery
+
+    /// Updates whether Find uses case-sensitive matching.
+    case setFindCaseSensitivity
 }
 
 /// Keys used in `quickMarkdownViewerFindCommand` notification payloads.
@@ -44,6 +51,18 @@ enum QuickMarkdownViewerFindCommandUserInfoKey: String {
 
     /// Integer `windowNumber` that should handle the command.
     case targetWindowNumber
+
+    /// Updated Find query value supplied by toolbar/panel UI.
+    case query
+
+    /// Updated case-sensitivity state supplied by toolbar/panel UI.
+    case isCaseSensitive
+
+    /// True when the query update should trigger an immediate search.
+    case shouldRunSearch
+
+    /// True when Find failures should beep.
+    case shouldBeepOnNoMatch
 }
 
 /// Supported in-document zoom actions for QuickMarkdownViewer windows.
@@ -284,18 +303,18 @@ final class QuickMarkdownViewerAppDelegate: NSObject, NSApplicationDelegate {
     private func retargetMainMenuDocumentActionsIfNeeded() {
         guard let mainMenu = NSApp.mainMenu else { return }
 
-        if let printItem = firstMenuItem(in: mainMenu) { item in
+        if let printItem = firstMenuItem(in: mainMenu, where: { item in
             item.keyEquivalent.lowercased() == "p" &&
-            item.keyEquivalentModifierMask.contains(.command)
-        } {
+                item.keyEquivalentModifierMask.contains(.command)
+        }) {
             printItem.target = self
             printItem.action = #selector(printDocument(_:))
         }
 
-        if let exportItem = firstMenuItem(in: mainMenu) { item in
+        if let exportItem = firstMenuItem(in: mainMenu, where: { item in
             item.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 .hasPrefix("Export as PDF")
-        } {
+        }) {
             exportItem.target = self
             exportItem.action = #selector(exportRenderedPDF(_:))
         }
@@ -412,6 +431,17 @@ final class AppRouting: ObservableObject {
     /// the latest native recent-documents state.
     @Published private var recentDocumentsRevision: UInt = 0
 
+    /// Tiny published token used to refresh toolbar-related command labels.
+    @Published private var toolbarVisibilityRevision: UInt = 0
+
+    /// Read-only token consumed by SwiftUI commands to refresh toolbar labels.
+    var toolbarVisibilityMenuRevision: UInt {
+        toolbarVisibilityRevision
+    }
+
+    /// Most recent document window used for menu-state fallback routing.
+    private weak var lastRoutedDocumentWindow: NSWindow?
+
     /// Private init enforces the shared-router model.
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -510,9 +540,17 @@ final class AppRouting: ObservableObject {
         notifyRecentDocumentsChanged()
     }
 
-    /// Toggles Find UI in the currently active window (`Cmd+F`).
+    /// Opens/focuses Find UI in the currently active window (`Cmd+F`).
+    ///
+    /// When toolbar is visible, this focuses the toolbar search field.
+    /// When toolbar is hidden, this shows/focuses the floating Find panel.
     func toggleFindInActiveWindow() {
-        dispatchFindCommandToActiveWindow(.toggleFindBar)
+        guard let controller = activeDocumentWindowController() else {
+            NSSound.beep()
+            return
+        }
+
+        controller.toggleFindUI()
     }
 
     /// Advances Find to the next match in the active window (`Cmd+G`).
@@ -527,7 +565,63 @@ final class AppRouting: ObservableObject {
 
     /// Hides Find UI in the active window.
     func hideFindInActiveWindow() {
+        if let controller = activeDocumentWindowController() {
+            controller.hideFindUI()
+        }
+
         dispatchFindCommandToActiveWindow(.hideFindBar)
+    }
+
+    /// Toggles toolbar visibility for the currently active window.
+    func toggleToolbarInActiveWindow() {
+        guard let targetWindow = activeDocumentWindow() else {
+            NSSound.beep()
+            return
+        }
+
+        if let controller = controller(for: targetWindow) {
+            controller.toggleToolbarVisibility()
+            notifyToolbarVisibilityChanged()
+            DispatchQueue.main.async { [weak self] in
+                self?.notifyToolbarVisibilityChanged()
+            }
+            return
+        }
+
+        targetWindow.toggleToolbarShown(nil)
+        notifyToolbarVisibilityChanged()
+        DispatchQueue.main.async { [weak self] in
+            self?.notifyToolbarVisibilityChanged()
+        }
+    }
+
+    /// Returns whether the active routed window currently shows its toolbar.
+    func isToolbarVisibleInActiveWindow() -> Bool {
+        guard let targetWindow = activeDocumentWindow() else {
+            return lastRoutedDocumentWindow?.toolbar?.isVisible ?? true
+        }
+
+        return targetWindow.toolbar?.isVisible ?? true
+    }
+
+    /// Opens native toolbar customisation for the active window.
+    func customiseToolbarInActiveWindow() {
+        guard let targetWindow = activeDocumentWindow() else {
+            NSSound.beep()
+            return
+        }
+
+        if let controller = controller(for: targetWindow) {
+            controller.openToolbarCustomisation()
+            return
+        }
+
+        if let toolbar = targetWindow.toolbar {
+            toolbar.runCustomizationPalette(nil)
+            return
+        }
+
+        NSSound.beep()
     }
 
     /// Copies current selection into Find query in the active window (`Cmd+E`).
@@ -732,7 +826,17 @@ final class AppRouting: ObservableObject {
         // no control (including the top search field) should be focused by
         // default when a new QuickMarkdownViewer window appears.
         DispatchQueue.main.async { [weak window] in
-            _ = window?.makeFirstResponder(nil)
+            guard let window else {
+                return
+            }
+
+            // Avoid stealing focus from explicit user actions (for example Cmd+F
+            // immediately after opening a document).
+            if window.firstResponder is NSSearchField {
+                return
+            }
+
+            _ = window.makeFirstResponder(nil)
         }
     }
 
@@ -915,7 +1019,17 @@ final class AppRouting: ObservableObject {
         // no control (including the top search field) should be focused by
         // default when a new QuickMarkdownViewer window appears.
         DispatchQueue.main.async { [weak window] in
-            _ = window?.makeFirstResponder(nil)
+            guard let window else {
+                return
+            }
+
+            // Avoid stealing focus from explicit user actions (for example Cmd+F
+            // immediately after opening a document).
+            if window.firstResponder is NSSearchField {
+                return
+            }
+
+            _ = window.makeFirstResponder(nil)
         }
 
         // Perform immediate load + render for fast perceived open time.
@@ -1124,13 +1238,52 @@ final class AppRouting: ObservableObject {
         emptyWindows.forEach { $0.close() }
     }
 
+    /// Returns the retained controller that owns a given window instance.
+    private func controller(for window: NSWindow) -> DocumentWindowController? {
+        windowControllers.values.first(where: { $0.window === window })
+    }
+
+    /// Resolves the active document window used for routed commands.
+    ///
+    /// If a child utility panel (for example, floating Find) is key, we route
+    /// to its parent document window.
+    private func activeDocumentWindow() -> NSWindow? {
+        for candidate in [NSApp.keyWindow, NSApp.mainWindow].compactMap({ $0 }) {
+            if controller(for: candidate) != nil {
+                lastRoutedDocumentWindow = candidate
+                return candidate
+            }
+
+            if let parentWindow = candidate.parent,
+               controller(for: parentWindow) != nil {
+                lastRoutedDocumentWindow = parentWindow
+                return parentWindow
+            }
+        }
+
+        if let fallbackWindow = lastRoutedDocumentWindow,
+           controller(for: fallbackWindow) != nil {
+            return fallbackWindow
+        }
+
+        return nil
+    }
+
+    /// Returns the controller for the active routed document window.
+    private func activeDocumentWindowController() -> DocumentWindowController? {
+        guard let targetWindow = activeDocumentWindow() else {
+            return nil
+        }
+
+        return controller(for: targetWindow)
+    }
+
     /// Routes a Find command to the currently active titled window.
     ///
     /// Using notifications keeps command handling decoupled from view-tree
     /// ownership while still targeting exactly one window.
     private func dispatchFindCommandToActiveWindow(_ command: QuickMarkdownViewerFindCommand) {
-        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
-              targetWindow.styleMask.contains(.titled) else {
+        guard let targetWindow = activeDocumentWindow() else {
             NSSound.beep()
             return
         }
@@ -1150,8 +1303,7 @@ final class AppRouting: ObservableObject {
     /// responds, even when multiple Markdown documents are open at the same
     /// time.
     private func dispatchZoomCommandToActiveWindow(_ command: QuickMarkdownViewerZoomCommand) {
-        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
-              targetWindow.styleMask.contains(.titled) else {
+        guard let targetWindow = activeDocumentWindow() else {
             NSSound.beep()
             return
         }
@@ -1170,8 +1322,7 @@ final class AppRouting: ObservableObject {
     /// Targeting by concrete window object keeps behaviour deterministic when
     /// multiple Markdown windows are open at the same time.
     private func dispatchDocumentCommandToActiveWindow(_ command: QuickMarkdownViewerDocumentCommand) {
-        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
-              targetWindow.styleMask.contains(.titled) else {
+        guard let targetWindow = activeDocumentWindow() else {
             NSSound.beep()
             return
         }
@@ -1190,8 +1341,7 @@ final class AppRouting: ObservableObject {
     /// We intentionally use window `representedURL` here because it tracks the
     /// currently open source file for each QuickMarkdownViewer document window.
     private func activeDocumentFileURLForCommands() -> URL? {
-        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
-              targetWindow.styleMask.contains(.titled),
+        guard let targetWindow = activeDocumentWindow(),
               let representedURL = targetWindow.representedURL else {
             return nil
         }
@@ -1201,12 +1351,26 @@ final class AppRouting: ObservableObject {
 
     /// Returns whether the active titled window currently hosts a document URL.
     private var hasActiveDocumentWindowForCommands: Bool {
-        guard let targetWindow = NSApp.keyWindow ?? NSApp.mainWindow,
-              targetWindow.styleMask.contains(.titled) else {
+        guard let targetWindow = activeDocumentWindow() else {
             return false
         }
 
         return targetWindow.representedURL != nil
+    }
+
+    /// Records the active document window when key focus changes.
+    func noteDocumentWindowBecameKey(_ window: NSWindow) {
+        guard controller(for: window) != nil else {
+            return
+        }
+
+        lastRoutedDocumentWindow = window
+        notifyToolbarVisibilityChanged()
+    }
+
+    /// Triggers command menu refresh after toolbar visibility changes.
+    func notifyToolbarVisibilityDidChange() {
+        notifyToolbarVisibilityChanged()
     }
 
     /// Returns the persisted explicit appearance mode, if any.
@@ -1249,6 +1413,27 @@ final class AppRouting: ObservableObject {
     private func notifyRecentDocumentsChanged() {
         recentDocumentsRevision &+= 1
     }
+
+    /// Bumps toolbar command refresh token.
+    private func notifyToolbarVisibilityChanged() {
+        toolbarVisibilityRevision &+= 1
+    }
+}
+
+/// Small controller used to cleanly drop retained window references on close.
+@MainActor
+private final class DocumentWindowToolbar: NSToolbar {
+    /// Callback fired whenever display mode changes.
+    var onDisplayModeChanged: ((NSToolbar) -> Void)?
+
+    override var displayMode: NSToolbar.DisplayMode {
+        didSet {
+            guard oldValue != displayMode else {
+                return
+            }
+            onDisplayModeChanged?(self)
+        }
+    }
 }
 
 /// Small controller used to cleanly drop retained window references on close.
@@ -1271,6 +1456,79 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     private let fileOpenService: FileOpenService
     private let renderService: MarkdownRenderService
 
+    /// Combine cancellables for document-state observation.
+    private var cancellables: Set<AnyCancellable> = []
+
+    /// Observation token for document-window Find state updates.
+    private var findStateObserver: NSObjectProtocol?
+
+    /// Current query mirrored between toolbar and optional Find panel.
+    private var currentFindQuery = ""
+
+    /// Current case-sensitive mode mirrored between toolbar and Find panel.
+    private var isFindCaseSensitive = false
+
+    /// True while syncing AppKit search controls programmatically.
+    private var isSyncingFindControls = false
+
+    /// True while this window is actively toggling toolbar visibility.
+    private var isTogglingToolbarVisibility = false
+
+    /// True when the next toolbar display-mode callback should be ignored.
+    private var ignoreNextDisplayModeChange = false
+
+    /// Managed native toolbar for this window.
+    private weak var managedToolbar: NSToolbar?
+
+    /// Search field hosted in the currently inserted toolbar search item.
+    ///
+    /// This intentionally excludes non-inserted palette preview instances.
+    private weak var toolbarSearchField: NSSearchField?
+
+    /// Floating Find panel shown when toolbar is hidden.
+    private var floatingFindPanel: NSPanel?
+
+    /// Search field hosted in the floating Find panel.
+    private weak var floatingFindSearchField: NSSearchField?
+
+    /// Toolbar items requiring enabled-state refreshes.
+    private weak var shareToolbarItem: NSToolbarItem?
+    private weak var viewSourceToolbarItem: NSToolbarItem?
+    private weak var zoomToFitToolbarItem: NSToolbarItem?
+    private weak var actualSizeToolbarItem: NSToolbarItem?
+    private weak var printToolbarItem: NSToolbarItem?
+    private weak var exportPDFToolbarItem: NSToolbarItem?
+    private weak var searchToolbarGenericItem: NSToolbarItem?
+    private weak var zoomLegacyGroupItem: NSToolbarItemGroup?
+    private weak var zoomOutInGroupItem: NSToolbarItemGroup?
+    private weak var printExportGroupItem: NSToolbarItemGroup?
+    private weak var appearanceGroupItem: NSToolbarItemGroup?
+
+    /// Stable toolbar identifiers for customisation/default layouts.
+    private enum ToolbarItemIdentifier {
+        static let toolbar = NSToolbar.Identifier("QuickMarkdownViewer.MainToolbar")
+
+        static let open = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.Open")
+        static let zoomLegacy = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.ZoomLegacy")
+        static let appearance = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.Appearance")
+        static let printExportGroup = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.PrintExportGroup")
+        static let search = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.Search")
+
+        static let share = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.Share")
+        static let viewSource = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.ViewSource")
+        static let zoomToFit = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.ZoomToFit")
+        static let actualSize = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.ActualSize")
+        static let zoomOutIn = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.ZoomOutIn")
+        static let print = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.Print")
+        static let exportPDF = NSToolbarItem.Identifier("QuickMarkdownViewer.Toolbar.ExportPDF")
+    }
+
+    /// Tags used by case-mode menu items.
+    private enum FindMenuTag {
+        static let caseInsensitive = 9101
+        static let caseSensitive = 9102
+    }
+
     init(
         window: NSWindow,
         id: UUID,
@@ -1285,6 +1543,9 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         self.renderService = renderService
         self.onClose = onClose
         super.init(window: window)
+        configureToolbar(on: window)
+        installDocumentStateObservers()
+        installFindStateObserver(for: window)
     }
 
     @available(*, unavailable)
@@ -1294,6 +1555,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
 
     /// Notify router so it can release the closed window controller.
     func windowWillClose(_ notification: Notification) {
+        closeFloatingFindPanel()
         onClose(id)
     }
 
@@ -1302,7 +1564,13 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     /// This keeps QuickMarkdownViewer in sync with external edits while staying
     /// low risk: reload occurs only when on-disk file fingerprint changed.
     func windowDidBecomeKey(_ notification: Notification) {
+        if let window {
+            AppRouting.shared.noteDocumentWindowBecameKey(window)
+        }
+
         guard let fileURL = window?.representedURL else {
+            refreshToolbarItemState()
+            refreshAppearanceSelection()
             return
         }
 
@@ -1311,6 +1579,12 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             fileOpenService: fileOpenService,
             renderService: renderService
         )
+
+        refreshToolbarItemState()
+        refreshAppearanceSelection()
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshToolbarItemState()
+        }
     }
 
     /// Reloads the document displayed in this window from disk.
@@ -1326,5 +1600,1104 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             fileOpenService: fileOpenService,
             renderService: renderService
         )
+    }
+
+    /// Handles Cmd+F behaviour for this window.
+    ///
+    /// Toolbar visible: focus toolbar search field.
+    /// Toolbar hidden: show/focus floating Find panel.
+    func toggleFindUI() {
+        guard canUseDocumentControls else {
+            NSSound.beep()
+            return
+        }
+
+        if shouldPresentFloatingFindPanelForCurrentToolbarMode() {
+            showFloatingFindPanel()
+            return
+        }
+
+        focusToolbarSearchField()
+    }
+
+    /// Hides any active Find UI owned by this controller.
+    func hideFindUI() {
+        closeFloatingFindPanel()
+        if let searchField = toolbarSearchField,
+           searchField.window?.firstResponder === searchField {
+            window?.makeFirstResponder(nil)
+        }
+    }
+
+    /// Toggles window toolbar visibility.
+    func toggleToolbarVisibility() {
+        guard let window else {
+            return
+        }
+
+        guard let toolbar = window.toolbar else {
+            return
+        }
+
+        isTogglingToolbarVisibility = true
+        ignoreNextDisplayModeChange = true
+
+        if toolbar.isVisible {
+            closeFloatingFindPanel()
+        }
+        window.toggleToolbarShown(nil)
+        DispatchQueue.main.async {
+            AppRouting.shared.notifyToolbarVisibilityDidChange()
+        }
+
+        // Keep mode-change rebuilds paused until AppKit finishes this toggle.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            self?.isTogglingToolbarVisibility = false
+            self?.ignoreNextDisplayModeChange = false
+        }
+    }
+
+    /// Opens native toolbar customisation palette.
+    func openToolbarCustomisation() {
+        if let toolbar = window?.toolbar {
+            toolbar.runCustomizationPalette(nil)
+            return
+        }
+
+        NSSound.beep()
+    }
+
+    /// True when document-driven controls should be enabled.
+    private var canUseDocumentControls: Bool {
+        if case .loaded = documentState.phase, documentState.document != nil {
+            return true
+        }
+
+        return false
+    }
+
+    /// True when this window's toolbar is currently visible.
+    private var isToolbarVisible: Bool {
+        window?.toolbar?.isVisible ?? false
+    }
+
+    /// Configures one native, customisable toolbar for this document window.
+    private func configureToolbar(on window: NSWindow) {
+        let toolbar = DocumentWindowToolbar(identifier: ToolbarItemIdentifier.toolbar)
+        toolbar.delegate = self
+        toolbar.allowsUserCustomization = true
+        if #available(macOS 15.0, *) {
+            toolbar.allowsDisplayModeCustomization = true
+        }
+        toolbar.autosavesConfiguration = true
+        toolbar.sizeMode = .small
+        toolbar.showsBaselineSeparator = true
+
+        if !hasSavedToolbarConfiguration() {
+            toolbar.displayMode = .iconOnly
+        }
+
+        window.toolbar = toolbar
+        window.toolbarStyle = .unified
+        managedToolbar = toolbar
+
+        toolbar.onDisplayModeChanged = { [weak self] toolbar in
+            guard let self else {
+                return
+            }
+
+            if self.ignoreNextDisplayModeChange {
+                self.ignoreNextDisplayModeChange = false
+                return
+            }
+
+            guard !self.isTogglingToolbarVisibility else {
+                return
+            }
+
+            guard toolbar.isVisible else {
+                return
+            }
+
+            self.rebuildSearchToolbarItemIfNeeded(in: toolbar)
+        }
+    }
+
+    /// Returns true when AppKit already persisted user toolbar customisation.
+    private func hasSavedToolbarConfiguration() -> Bool {
+        let defaultsKey = "NSToolbar Configuration \(ToolbarItemIdentifier.toolbar)"
+        return UserDefaults.standard.object(forKey: defaultsKey) != nil
+    }
+
+    /// Installs observation hooks used for toolbar enabled-state refreshes.
+    private func installDocumentStateObservers() {
+        documentState.$phase
+            .sink { [weak self] _ in
+                self?.refreshToolbarItemState()
+            }
+            .store(in: &cancellables)
+
+        documentState.$document
+            .sink { [weak self] _ in
+                self?.refreshToolbarItemState()
+            }
+            .store(in: &cancellables)
+    }
+
+    /// Installs observer for Find state updates published by DocumentWindowView.
+    private func installFindStateObserver(for window: NSWindow) {
+        findStateObserver = NotificationCenter.default.addObserver(
+            forName: .quickMarkdownViewerFindStateDidChange,
+            object: window,
+            queue: .main
+        ) { [weak self] notification in
+            let query =
+                notification.userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue] as? String ?? ""
+            let caseSensitive =
+                notification.userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue] as? Bool ?? false
+
+            Task { @MainActor in
+                guard let self else {
+                    return
+                }
+
+                self.currentFindQuery = query
+                self.isFindCaseSensitive = caseSensitive
+                self.syncFindControlsFromState()
+            }
+        }
+    }
+
+    /// Applies current query/case state to toolbar and floating panel fields.
+    private func syncFindControlsFromState() {
+        resolveToolbarSearchReferences()
+        isSyncingFindControls = true
+        defer { isSyncingFindControls = false }
+
+        if let toolbarField = toolbarSearchField,
+           toolbarField.stringValue != currentFindQuery {
+            toolbarField.stringValue = currentFindQuery
+        }
+
+        if let panelField = floatingFindSearchField,
+           panelField.stringValue != currentFindQuery {
+            panelField.stringValue = currentFindQuery
+        }
+
+        syncFindMenuCheckmarks(for: toolbarSearchField?.searchMenuTemplate)
+        syncFindMenuCheckmarks(for: floatingFindSearchField?.searchMenuTemplate)
+    }
+
+    /// Refreshes enabled/disabled state for document-bound toolbar items.
+    private func refreshToolbarItemState() {
+        resolveToolbarSearchReferences()
+        let isEnabled = canUseDocumentControls
+
+        shareToolbarItem?.isEnabled = isEnabled
+        viewSourceToolbarItem?.isEnabled = isEnabled
+        zoomToFitToolbarItem?.isEnabled = isEnabled
+        actualSizeToolbarItem?.isEnabled = isEnabled
+        printToolbarItem?.isEnabled = isEnabled
+        exportPDFToolbarItem?.isEnabled = isEnabled
+        searchToolbarGenericItem?.isEnabled = isEnabled
+        toolbarSearchField?.isEnabled = isEnabled
+
+        zoomLegacyGroupItem?.isEnabled = isEnabled
+        zoomLegacyGroupItem?.subitems.forEach { $0.isEnabled = isEnabled }
+
+        zoomOutInGroupItem?.isEnabled = isEnabled
+        zoomOutInGroupItem?.subitems.forEach { $0.isEnabled = isEnabled }
+
+        printExportGroupItem?.isEnabled = isEnabled
+        printExportGroupItem?.subitems.forEach { $0.isEnabled = isEnabled }
+
+        if !isEnabled {
+            closeFloatingFindPanel()
+        }
+    }
+
+    /// Resolves the currently inserted toolbar search field, if available.
+    ///
+    /// AppKit may build preview toolbar items for customisation contexts. We
+    /// only keep references to fields actually inserted in this window toolbar.
+    private func resolveToolbarSearchReferences() {
+        guard let toolbar = managedToolbar,
+              let searchItem = toolbar.items.first(where: { $0.itemIdentifier == ToolbarItemIdentifier.search }) else {
+            toolbarSearchField = nil
+            return
+        }
+
+        toolbarSearchField = searchItem.view as? NSSearchField
+        searchToolbarGenericItem = searchItem
+    }
+
+    /// Rebuilds Search toolbar item when display mode changes.
+    ///
+    /// This lets label-only mode use a plain action item (Preview-like) while
+    /// icon-containing modes use a toolbar-hosted native `NSSearchField`.
+    private func rebuildSearchToolbarItemIfNeeded(in toolbar: NSToolbar) {
+        guard toolbar.isVisible else {
+            return
+        }
+
+        guard let searchIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == ToolbarItemIdentifier.search }) else {
+            return
+        }
+
+        let isTextOnlyMode = toolbar.displayMode == .labelOnly
+        let hasSearchFieldView = toolbar.items[searchIndex].view is NSSearchField
+        if (isTextOnlyMode && !hasSearchFieldView) || (!isTextOnlyMode && hasSearchFieldView) {
+            return
+        }
+
+        toolbar.removeItem(at: searchIndex)
+        toolbar.insertItem(withItemIdentifier: ToolbarItemIdentifier.search, at: searchIndex)
+        refreshToolbarItemState()
+        syncFindControlsFromState()
+    }
+
+    /// Returns true when Search is currently represented as a text-only action.
+    private func isSearchPresentedAsActionItem() -> Bool {
+        guard let toolbar = managedToolbar,
+              let searchItem = toolbar.items.first(where: { $0.itemIdentifier == ToolbarItemIdentifier.search }) else {
+            return false
+        }
+
+        return searchItem.view == nil
+    }
+
+    /// Returns true when the floating Find panel should be used.
+    ///
+    /// This guards text-only toolbar mode and edge-cases where AppKit keeps the
+    /// search field item cached but detaches its view hierarchy.
+    private func shouldPresentFloatingFindPanelForCurrentToolbarMode() -> Bool {
+        guard isToolbarVisible else {
+            return true
+        }
+
+        if isSearchPresentedAsActionItem() {
+            return true
+        }
+
+        if managedToolbar?.displayMode == .labelOnly {
+            return true
+        }
+
+        resolveToolbarSearchReferences()
+        guard let toolbarSearchField else {
+            return true
+        }
+
+        if toolbarSearchField.window == nil || toolbarSearchField.superview == nil {
+            return true
+        }
+
+        return false
+    }
+
+    /// Keeps appearance controls visually stable across mode switches.
+    private func refreshAppearanceSelection() {
+        // No-op by design: the appearance toolbar group is momentary so it
+        // keeps capsule styling instead of latching selected segments.
+    }
+
+    /// Creates one SF Symbol image or a plain placeholder fallback.
+    private func toolbarSymbolImage(_ symbolName: String, fallbackAccessibilityLabel: String) -> NSImage {
+        if let image = NSImage(systemSymbolName: symbolName, accessibilityDescription: fallbackAccessibilityLabel) {
+            return image
+        }
+
+        return NSImage(size: NSSize(width: 16, height: 16))
+    }
+
+    /// Applies consistent toolbar-item behaviour for customisation menus.
+    private func preparedToolbarItem<T: NSToolbarItem>(_ item: T) -> T {
+        if #available(macOS 13.0, *) {
+            item.isNavigational = false
+        }
+        return item
+    }
+
+    /// Creates one native Find menu template used by search fields.
+    private func makeFindModeMenu() -> NSMenu {
+        let menu = NSMenu(title: "Search Mode")
+        menu.autoenablesItems = true
+        menu.delegate = self
+
+        let caseInsensitiveItem = NSMenuItem(
+            title: "Case Insensitive",
+            action: #selector(selectCaseInsensitiveFindMode(_:)),
+            keyEquivalent: ""
+        )
+        caseInsensitiveItem.tag = FindMenuTag.caseInsensitive
+        caseInsensitiveItem.target = self
+        menu.addItem(caseInsensitiveItem)
+
+        let caseSensitiveItem = NSMenuItem(
+            title: "Case Sensitive",
+            action: #selector(selectCaseSensitiveFindMode(_:)),
+            keyEquivalent: ""
+        )
+        caseSensitiveItem.tag = FindMenuTag.caseSensitive
+        caseSensitiveItem.target = self
+        menu.addItem(caseSensitiveItem)
+
+        syncFindMenuCheckmarks(for: menu)
+        return menu
+    }
+
+    /// Applies Find mode checkmarks to a menu.
+    private func syncFindMenuCheckmarks(for menu: NSMenu?) {
+        guard let menu else {
+            return
+        }
+
+        menu.item(withTag: FindMenuTag.caseInsensitive)?.state = isFindCaseSensitive ? .off : .on
+        menu.item(withTag: FindMenuTag.caseSensitive)?.state = isFindCaseSensitive ? .on : .off
+    }
+
+    /// Focuses and selects the toolbar search field.
+    private func focusToolbarSearchField(allowRetry: Bool = true) {
+        refreshToolbarItemState()
+        resolveToolbarSearchReferences()
+
+        guard let toolbarSearchField, toolbarSearchField.isEnabled else {
+            if allowRetry {
+                DispatchQueue.main.async { [weak self] in
+                    self?.focusToolbarSearchField(allowRetry: false)
+                }
+                return
+            }
+            NSSound.beep()
+            return
+        }
+
+        closeFloatingFindPanel()
+        syncFindControlsFromState()
+        window?.makeFirstResponder(toolbarSearchField)
+        toolbarSearchField.selectText(nil)
+    }
+
+    /// Shows the floating Find panel near the owning document window.
+    private func showFloatingFindPanel() {
+        guard let hostWindow = window else {
+            return
+        }
+
+        let panel = ensureFloatingFindPanel()
+        let wasVisible = panel.isVisible
+        syncFindControlsFromState()
+
+        if !wasVisible {
+            let panelSize = panel.frame.size
+            let origin = NSPoint(
+                x: hostWindow.frame.midX - (panelSize.width / 2),
+                y: hostWindow.frame.midY - (panelSize.height / 2)
+            )
+            panel.setFrameOrigin(origin)
+        }
+
+        if panel.parent !== hostWindow {
+            hostWindow.addChildWindow(panel, ordered: NSWindow.OrderingMode.above)
+        }
+
+        panel.makeKeyAndOrderFront(nil)
+        if let searchField = floatingFindSearchField {
+            panel.makeFirstResponder(searchField)
+            searchField.selectText(nil)
+        }
+    }
+
+    /// Closes the floating Find panel if currently visible.
+    private func closeFloatingFindPanel() {
+        guard let panel = floatingFindPanel else {
+            return
+        }
+
+        if let parentWindow = panel.parent {
+            parentWindow.removeChildWindow(panel)
+        }
+        panel.orderOut(nil)
+    }
+
+    /// Lazily creates the floating Find panel UI.
+    private func ensureFloatingFindPanel() -> NSPanel {
+        if let existingPanel = floatingFindPanel {
+            return existingPanel
+        }
+
+        let panelSize = NSSize(width: 320, height: 110)
+        let panel = NSPanel(
+            contentRect: NSRect(origin: .zero, size: panelSize),
+            styleMask: [.titled, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        panel.title = ""
+        panel.titleVisibility = .hidden
+        panel.titlebarAppearsTransparent = true
+        panel.isReleasedWhenClosed = false
+        panel.hidesOnDeactivate = false
+        panel.isFloatingPanel = true
+        panel.isMovableByWindowBackground = true
+        panel.level = .floating
+        panel.standardWindowButton(.closeButton)?.isHidden = true
+        panel.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        panel.standardWindowButton(.zoomButton)?.isHidden = true
+
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let label = NSTextField(labelWithString: "Search:")
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        let searchField = NSSearchField()
+        searchField.translatesAutoresizingMaskIntoConstraints = false
+        searchField.delegate = self
+        searchField.target = self
+        searchField.action = #selector(submitFindFromSearchField(_:))
+        searchField.sendsSearchStringImmediately = true
+        searchField.sendsWholeSearchString = true
+        searchField.searchMenuTemplate = makeFindModeMenu()
+        floatingFindSearchField = searchField
+
+        let cancelButton = NSButton(title: "Cancel", target: self, action: #selector(cancelFloatingFindPanel(_:)))
+        cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        cancelButton.bezelStyle = .rounded
+
+        let okButton = NSButton(title: "OK", target: self, action: #selector(confirmFloatingFindPanel(_:)))
+        okButton.translatesAutoresizingMaskIntoConstraints = false
+        okButton.keyEquivalent = "\r"
+        okButton.bezelStyle = .rounded
+
+        container.addSubview(label)
+        container.addSubview(searchField)
+        container.addSubview(cancelButton)
+        container.addSubview(okButton)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 20),
+            label.centerYAnchor.constraint(equalTo: searchField.centerYAnchor),
+
+            searchField.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 10),
+            searchField.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
+            searchField.topAnchor.constraint(equalTo: container.topAnchor, constant: 18),
+
+            okButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -20),
+            okButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -14),
+            okButton.widthAnchor.constraint(equalToConstant: 70),
+
+            cancelButton.trailingAnchor.constraint(equalTo: okButton.leadingAnchor, constant: -10),
+            cancelButton.bottomAnchor.constraint(equalTo: okButton.bottomAnchor),
+            cancelButton.widthAnchor.constraint(equalToConstant: 70)
+        ])
+
+        panel.contentView = container
+        floatingFindPanel = panel
+        return panel
+    }
+
+    /// Dispatches one Find query update to this window's view layer.
+    private func dispatchFindQueryUpdate(shouldBeepOnNoMatch: Bool) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerFindCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerFindCommandUserInfoKey.command.rawValue: QuickMarkdownViewerFindCommand.setFindQuery.rawValue,
+                QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue: currentFindQuery,
+                QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isFindCaseSensitive,
+                QuickMarkdownViewerFindCommandUserInfoKey.shouldRunSearch.rawValue: true,
+                QuickMarkdownViewerFindCommandUserInfoKey.shouldBeepOnNoMatch.rawValue: shouldBeepOnNoMatch
+            ]
+        )
+    }
+
+    /// Dispatches one case-sensitivity update to this window's view layer.
+    private func dispatchFindCaseSensitivityUpdate() {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerFindCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerFindCommandUserInfoKey.command.rawValue:
+                    QuickMarkdownViewerFindCommand.setFindCaseSensitivity.rawValue,
+                QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isFindCaseSensitive
+            ]
+        )
+    }
+
+    /// Handles Open toolbar action.
+    @objc private func openDocumentFromToolbar(_ sender: Any?) {
+        AppRouting.shared.openDocumentPanel()
+    }
+
+    /// Handles Zoom In toolbar action.
+    @objc private func zoomInFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerZoomCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerZoomCommandUserInfoKey.command.rawValue: QuickMarkdownViewerZoomCommand.zoomIn.rawValue
+            ]
+        )
+    }
+
+    /// Handles Zoom Out toolbar action.
+    @objc private func zoomOutFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerZoomCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerZoomCommandUserInfoKey.command.rawValue: QuickMarkdownViewerZoomCommand.zoomOut.rawValue
+            ]
+        )
+    }
+
+    /// Handles Actual Size toolbar action.
+    @objc private func actualSizeFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerZoomCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerZoomCommandUserInfoKey.command.rawValue:
+                    QuickMarkdownViewerZoomCommand.resetToActualSize.rawValue
+            ]
+        )
+    }
+
+    /// Handles Zoom to Fit toolbar action.
+    @objc private func zoomToFitFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerZoomCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerZoomCommandUserInfoKey.command.rawValue: QuickMarkdownViewerZoomCommand.zoomToFit.rawValue
+            ]
+        )
+    }
+
+    /// Handles Print toolbar action.
+    @objc private func printFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerDocumentCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerDocumentCommandUserInfoKey.command.rawValue:
+                    QuickMarkdownViewerDocumentCommand.printRenderedDocument.rawValue
+            ]
+        )
+    }
+
+    /// Handles Export PDF toolbar action.
+    @objc private func exportPDFFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerDocumentCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerDocumentCommandUserInfoKey.command.rawValue:
+                    QuickMarkdownViewerDocumentCommand.exportRenderedPDF.rawValue
+            ]
+        )
+    }
+
+    /// Handles View Source toolbar action.
+    @objc private func viewSourceFromToolbar(_ sender: Any?) {
+        guard let hostWindow = window else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerDocumentCommand,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerDocumentCommandUserInfoKey.command.rawValue:
+                    QuickMarkdownViewerDocumentCommand.viewSourceExternally.rawValue
+            ]
+        )
+    }
+
+    /// Handles selecting light appearance from toolbar.
+    @objc private func setLightAppearanceFromToolbar(_ sender: Any?) {
+        AppRouting.shared.setLightAppearanceMode()
+        refreshAppearanceSelection()
+    }
+
+    /// Handles selecting dark appearance from toolbar.
+    @objc private func setDarkAppearanceFromToolbar(_ sender: Any?) {
+        AppRouting.shared.setDarkAppearanceMode()
+        refreshAppearanceSelection()
+    }
+
+    /// Handles legacy 3-button zoom group (out / actual / in).
+    @objc private func handleZoomLegacyGroupSelection(_ sender: NSToolbarItemGroup) {
+        switch sender.selectedIndex {
+        case 0:
+            zoomOutFromToolbar(sender)
+        case 1:
+            actualSizeFromToolbar(sender)
+        case 2:
+            zoomInFromToolbar(sender)
+        default:
+            break
+        }
+    }
+
+    /// Handles 2-button appearance group (light / dark).
+    @objc private func handleAppearanceGroupSelection(_ sender: NSToolbarItemGroup) {
+        switch sender.selectedIndex {
+        case 0:
+            setLightAppearanceFromToolbar(sender)
+        case 1:
+            setDarkAppearanceFromToolbar(sender)
+        default:
+            break
+        }
+    }
+
+    /// Handles grouped Print + Export action.
+    @objc private func handlePrintExportGroupSelection(_ sender: NSToolbarItemGroup) {
+        switch sender.selectedIndex {
+        case 0:
+            printFromToolbar(sender)
+        case 1:
+            exportPDFFromToolbar(sender)
+        default:
+            break
+        }
+    }
+
+    /// Handles 2-button zoom-out/in group.
+    @objc private func handleZoomOutInGroupSelection(_ sender: NSToolbarItemGroup) {
+        switch sender.selectedIndex {
+        case 0:
+            zoomOutFromToolbar(sender)
+        case 1:
+            zoomInFromToolbar(sender)
+        default:
+            break
+        }
+    }
+
+    /// Handles submitted Find from toolbar/panel fields.
+    @objc private func submitFindFromSearchField(_ sender: NSSearchField) {
+        currentFindQuery = sender.stringValue
+        syncFindControlsFromState()
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: true)
+    }
+
+    /// Handles toolbar Search item activation in text-only mode.
+    ///
+    /// In label-only display mode, macOS-style behaviour is to show a compact
+    /// Find panel rather than switching the toolbar presentation mode.
+    @objc private func handleSearchToolbarItemActivation(_ sender: Any?) {
+        if shouldPresentFloatingFindPanelForCurrentToolbarMode() {
+            showFloatingFindPanel()
+            return
+        }
+
+        focusToolbarSearchField()
+    }
+
+    /// Handles Cancel button in floating Find panel.
+    @objc private func cancelFloatingFindPanel(_ sender: Any?) {
+        closeFloatingFindPanel()
+    }
+
+    /// Handles OK button in floating Find panel.
+    @objc private func confirmFloatingFindPanel(_ sender: Any?) {
+        if let searchField = floatingFindSearchField {
+            currentFindQuery = searchField.stringValue
+        }
+        syncFindControlsFromState()
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: true)
+        closeFloatingFindPanel()
+    }
+
+    /// Handles selecting case-insensitive mode from search menu.
+    @objc private func selectCaseInsensitiveFindMode(_ sender: NSMenuItem) {
+        isFindCaseSensitive = false
+        syncFindControlsFromState()
+        dispatchFindCaseSensitivityUpdate()
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: false)
+    }
+
+    /// Handles selecting case-sensitive mode from search menu.
+    @objc private func selectCaseSensitiveFindMode(_ sender: NSMenuItem) {
+        isFindCaseSensitive = true
+        syncFindControlsFromState()
+        dispatchFindCaseSensitivityUpdate()
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: false)
+    }
+
+deinit {
+        if let findStateObserver {
+            NotificationCenter.default.removeObserver(findStateObserver)
+        }
+    }
+}
+
+extension DocumentWindowController: NSMenuDelegate {
+    func menuWillOpen(_ menu: NSMenu) {
+        syncFindMenuCheckmarks(for: menu)
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        syncFindMenuCheckmarks(for: menu)
+    }
+}
+
+extension DocumentWindowController: NSMenuItemValidation {
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(selectCaseInsensitiveFindMode(_:)) {
+            menuItem.state = isFindCaseSensitive ? .off : .on
+            return true
+        }
+
+        if menuItem.action == #selector(selectCaseSensitiveFindMode(_:)) {
+            menuItem.state = isFindCaseSensitive ? .on : .off
+            return true
+        }
+
+        return true
+    }
+}
+
+extension DocumentWindowController: NSToolbarDelegate {
+    private static let defaultToolbarItemIdentifiers: [NSToolbarItem.Identifier] = [
+        ToolbarItemIdentifier.open,
+        ToolbarItemIdentifier.zoomLegacy,
+        ToolbarItemIdentifier.appearance,
+        ToolbarItemIdentifier.printExportGroup,
+        .flexibleSpace,
+        ToolbarItemIdentifier.search
+    ]
+
+    private static let allowedToolbarItemIdentifiers: [NSToolbarItem.Identifier] = [
+        ToolbarItemIdentifier.open,
+        ToolbarItemIdentifier.zoomLegacy,
+        ToolbarItemIdentifier.appearance,
+        ToolbarItemIdentifier.printExportGroup,
+        ToolbarItemIdentifier.search,
+        ToolbarItemIdentifier.share,
+        ToolbarItemIdentifier.viewSource,
+        ToolbarItemIdentifier.zoomToFit,
+        ToolbarItemIdentifier.actualSize,
+        ToolbarItemIdentifier.zoomOutIn,
+        ToolbarItemIdentifier.print,
+        ToolbarItemIdentifier.exportPDF,
+        .space,
+        .flexibleSpace
+    ]
+
+    func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        Self.defaultToolbarItemIdentifiers
+    }
+
+    func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        Self.allowedToolbarItemIdentifiers
+    }
+
+    func toolbarSelectableItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        []
+    }
+
+    func toolbar(
+        _ toolbar: NSToolbar,
+        itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+        willBeInsertedIntoToolbar flag: Bool
+    ) -> NSToolbarItem? {
+        switch itemIdentifier {
+        case ToolbarItemIdentifier.open:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Open"
+            item.paletteLabel = "Open"
+            item.toolTip = "Open a Markdown file"
+            item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Open")
+            item.target = self
+            item.action = #selector(openDocumentFromToolbar(_:))
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.zoomLegacy:
+            let group = NSToolbarItemGroup(
+                itemIdentifier: itemIdentifier,
+                images: [
+                    toolbarSymbolImage("minus.magnifyingglass", fallbackAccessibilityLabel: "Zoom Out"),
+                    toolbarSymbolImage("1.magnifyingglass", fallbackAccessibilityLabel: "Actual Size"),
+                    toolbarSymbolImage("plus.magnifyingglass", fallbackAccessibilityLabel: "Zoom In")
+                ],
+                selectionMode: .momentary,
+                labels: ["Zoom Out", "Actual Size", "Zoom In"],
+                target: self,
+                action: #selector(handleZoomLegacyGroupSelection(_:))
+            )
+            group.label = "Zoom"
+            group.paletteLabel = "Zoom"
+            group.toolTip = "Zoom controls"
+            group.controlRepresentation = .expanded
+            group.isEnabled = canUseDocumentControls
+            if flag {
+                zoomLegacyGroupItem = group
+            }
+            return preparedToolbarItem(group)
+
+        case ToolbarItemIdentifier.appearance:
+            let group = NSToolbarItemGroup(
+                itemIdentifier: itemIdentifier,
+                images: [
+                    toolbarSymbolImage("sun.max", fallbackAccessibilityLabel: "Light Mode"),
+                    toolbarSymbolImage("moon.fill", fallbackAccessibilityLabel: "Dark Mode")
+                ],
+                selectionMode: .momentary,
+                labels: ["Light Mode", "Dark Mode"],
+                target: self,
+                action: #selector(handleAppearanceGroupSelection(_:))
+            )
+            group.label = "Appearance"
+            group.paletteLabel = "Appearance"
+            group.toolTip = "Appearance controls"
+            group.controlRepresentation = .expanded
+            if flag {
+                appearanceGroupItem = group
+            }
+            refreshAppearanceSelection()
+            return preparedToolbarItem(group)
+
+        case ToolbarItemIdentifier.printExportGroup:
+            let group = NSToolbarItemGroup(
+                itemIdentifier: itemIdentifier,
+                images: [
+                    toolbarSymbolImage("printer", fallbackAccessibilityLabel: "Print"),
+                    toolbarSymbolImage("square.and.arrow.up.on.square", fallbackAccessibilityLabel: "Export as PDF")
+                ],
+                selectionMode: .momentary,
+                labels: ["Print", "Export as PDF"],
+                target: self,
+                action: #selector(handlePrintExportGroupSelection(_:))
+            )
+            group.label = "Print and Export"
+            group.paletteLabel = "Print and Export"
+            group.toolTip = "Print and export controls"
+            group.controlRepresentation = .expanded
+            group.isEnabled = canUseDocumentControls
+            if flag {
+                printExportGroupItem = group
+            }
+            return preparedToolbarItem(group)
+
+        case ToolbarItemIdentifier.search:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Search"
+            item.paletteLabel = "Search"
+            item.toolTip = "Search the current document"
+            item.isEnabled = canUseDocumentControls
+
+            if toolbar.displayMode == .labelOnly {
+                item.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search")
+                item.target = self
+                item.action = #selector(handleSearchToolbarItemActivation(_:))
+
+                if flag {
+                    toolbarSearchField = nil
+                    searchToolbarGenericItem = item
+                }
+
+                return preparedToolbarItem(item)
+            }
+
+            let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 220, height: 0))
+            searchField.controlSize = .small
+            searchField.delegate = self
+            searchField.target = self
+            searchField.action = #selector(submitFindFromSearchField(_:))
+            searchField.sendsSearchStringImmediately = true
+            searchField.sendsWholeSearchString = true
+            searchField.placeholderString = "Search"
+            searchField.searchMenuTemplate = makeFindModeMenu()
+            searchField.stringValue = currentFindQuery
+            searchField.isEnabled = canUseDocumentControls
+
+            item.view = searchField
+            item.target = self
+            item.action = #selector(handleSearchToolbarItemActivation(_:))
+
+            if flag {
+                toolbarSearchField = searchField
+                searchToolbarGenericItem = item
+            }
+
+            syncFindControlsFromState()
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.share:
+            let item = NSSharingServicePickerToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Share"
+            item.paletteLabel = "Share"
+            item.toolTip = "Share the current Markdown file"
+            item.image = NSImage(systemSymbolName: "square.and.arrow.up", accessibilityDescription: "Share")
+            item.delegate = self
+            item.isEnabled = canUseDocumentControls
+            if flag {
+                shareToolbarItem = item
+            }
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.viewSource:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "View Source"
+            item.paletteLabel = "View Source"
+            item.toolTip = "Open source in default text editor"
+            item.image = NSImage(systemSymbolName: "doc.plaintext", accessibilityDescription: "View Source")
+            item.target = self
+            item.action = #selector(viewSourceFromToolbar(_:))
+            item.isEnabled = canUseDocumentControls
+            if flag {
+                viewSourceToolbarItem = item
+            }
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.zoomToFit:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Zoom to Fit"
+            item.paletteLabel = "Zoom to Fit"
+            item.toolTip = "Fit content to window width"
+            item.image = NSImage(
+                systemSymbolName: "arrow.up.left.and.down.right.magnifyingglass",
+                accessibilityDescription: "Zoom to Fit"
+            )
+            item.target = self
+            item.action = #selector(zoomToFitFromToolbar(_:))
+            item.isEnabled = canUseDocumentControls
+            if flag {
+                zoomToFitToolbarItem = item
+            }
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.actualSize:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Actual Size"
+            item.paletteLabel = "Actual Size"
+            item.toolTip = "Reset zoom to 100%"
+            item.image = NSImage(systemSymbolName: "1.magnifyingglass", accessibilityDescription: "Actual Size")
+            item.target = self
+            item.action = #selector(actualSizeFromToolbar(_:))
+            item.isEnabled = canUseDocumentControls
+            if flag {
+                actualSizeToolbarItem = item
+            }
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.zoomOutIn:
+            let group = NSToolbarItemGroup(
+                itemIdentifier: itemIdentifier,
+                images: [
+                    toolbarSymbolImage("minus.magnifyingglass", fallbackAccessibilityLabel: "Zoom Out"),
+                    toolbarSymbolImage("plus.magnifyingglass", fallbackAccessibilityLabel: "Zoom In")
+                ],
+                selectionMode: .momentary,
+                labels: ["Zoom Out", "Zoom In"],
+                target: self,
+                action: #selector(handleZoomOutInGroupSelection(_:))
+            )
+            group.label = "Zoom Out/In"
+            group.paletteLabel = "Zoom Out/In"
+            group.toolTip = "Zoom controls"
+            group.controlRepresentation = .expanded
+            group.isEnabled = canUseDocumentControls
+            if flag {
+                zoomOutInGroupItem = group
+            }
+            return preparedToolbarItem(group)
+
+        case ToolbarItemIdentifier.print:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Print"
+            item.paletteLabel = "Print"
+            item.toolTip = "Print rendered Markdown"
+            item.image = NSImage(systemSymbolName: "printer", accessibilityDescription: "Print")
+            item.target = self
+            item.action = #selector(printFromToolbar(_:))
+            item.isEnabled = canUseDocumentControls
+            if flag {
+                printToolbarItem = item
+            }
+            return preparedToolbarItem(item)
+
+        case ToolbarItemIdentifier.exportPDF:
+            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Export as PDF"
+            item.paletteLabel = "Export as PDF"
+            item.toolTip = "Export rendered Markdown as PDF"
+            item.image = NSImage(
+                systemSymbolName: "square.and.arrow.up.on.square",
+                accessibilityDescription: "Export as PDF"
+            )
+            item.target = self
+            item.action = #selector(exportPDFFromToolbar(_:))
+            item.isEnabled = canUseDocumentControls
+            if flag {
+                exportPDFToolbarItem = item
+            }
+            return preparedToolbarItem(item)
+
+        default:
+            return nil
+        }
+    }
+}
+
+extension DocumentWindowController: NSSearchFieldDelegate {
+    func controlTextDidChange(_ notification: Notification) {
+        guard let searchField = notification.object as? NSSearchField else {
+            return
+        }
+
+        guard !isSyncingFindControls else {
+            return
+        }
+
+        currentFindQuery = searchField.stringValue
+        syncFindControlsFromState()
+        dispatchFindQueryUpdate(shouldBeepOnNoMatch: false)
+    }
+}
+
+extension DocumentWindowController: NSSharingServicePickerToolbarItemDelegate {
+    func items(for item: NSSharingServicePickerToolbarItem) -> [Any] {
+        guard let fileURL = documentState.document?.fileURL else {
+            return []
+        }
+
+        return [fileURL]
     }
 }

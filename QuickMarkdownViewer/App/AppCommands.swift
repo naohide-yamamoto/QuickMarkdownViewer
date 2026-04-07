@@ -195,6 +195,11 @@ struct AppCommands: Commands {
             Divider()
         }
 
+        // Replace the default toolbar command group so View-menu ordering is
+        // fully controlled by the custom QuickMarkdownViewer command block.
+        CommandGroup(replacing: .toolbar) {
+        }
+
         // Add standard zoom controls in the View menu for a familiar reading
         // workflow similar to Preview and other macOS document viewers.
         //
@@ -236,6 +241,27 @@ struct AppCommands: Commands {
                 Label("Zoom Out", systemImage: "minus.magnifyingglass")
             }
             .keyboardShortcut("-", modifiers: .command)
+
+            Divider()
+
+            let _ = routing.toolbarVisibilityMenuRevision
+            let isToolbarVisible = routing.isToolbarVisibleInActiveWindow()
+
+            Button(action: {
+                routing.toggleToolbarInActiveWindow()
+            }) {
+                Label(
+                    isToolbarVisible ? "Hide Toolbar" : "Show Toolbar",
+                    systemImage: isToolbarVisible ? "rectangle.compress.vertical" : "rectangle.expand.vertical"
+                )
+            }
+            .keyboardShortcut("t", modifiers: [.command, .option])
+
+            Button(action: {
+                routing.customiseToolbarInActiveWindow()
+            }) {
+                Label("Customise Toolbar…", systemImage: "wrench")
+            }
 
             Divider()
 

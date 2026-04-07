@@ -77,16 +77,11 @@ struct DocumentWindowView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            topControlBar
-            Divider()
+        ZStack {
+            content
 
-            ZStack {
-                content
-
-                if isDropTargeted {
-                    DragDropOverlayView()
-                }
+            if isDropTargeted {
+                DragDropOverlayView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -124,6 +119,13 @@ struct DocumentWindowView: View {
             // highlights always reflect the selected mode without extra steps.
             guard canUseDocumentControls else { return }
             runFind(direction: .forwards, shouldBeepOnNoMatch: false)
+            publishFindStateChange()
+        }
+        .onChange(of: findQuery) { _ in
+            publishFindStateChange()
+        }
+        .onChange(of: hostWindowObjectID) { _ in
+            publishFindStateChange()
         }
     }
 
@@ -294,7 +296,7 @@ struct DocumentWindowView: View {
             return
         }
 
-        handleFindCommand(command)
+        handleFindCommand(command, userInfo: notification.userInfo)
     }
 
     /// Applies a Zoom command if this view owns the target window.
@@ -352,16 +354,13 @@ struct DocumentWindowView: View {
     }
 
     /// Executes Find behaviour for this window.
-    private func handleFindCommand(_ command: QuickMarkdownViewerFindCommand) {
+    private func handleFindCommand(_ command: QuickMarkdownViewerFindCommand, userInfo: [AnyHashable: Any]?) {
         guard canUseDocumentControls else {
             NSSound.beep()
             return
         }
 
         switch command {
-        case .toggleFindBar:
-            focusFindField()
-
         case .findNext:
             focusFindField()
             runFind(direction: .forwards, shouldBeepOnNoMatch: true)
@@ -385,6 +384,32 @@ struct DocumentWindowView: View {
             clearFindFieldFocus()
             hasAttemptedFind = false
             didFindMatch = true
+
+        case .setFindQuery:
+            let updatedQuery =
+                userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue] as? String ?? ""
+            let updatedCaseSensitivity =
+                userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue] as? Bool
+            let shouldRunSearch =
+                userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.shouldRunSearch.rawValue] as? Bool ?? true
+            let shouldBeep =
+                userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.shouldBeepOnNoMatch.rawValue] as? Bool ?? false
+
+            findQuery = updatedQuery
+            if let updatedCaseSensitivity {
+                isCaseSensitiveSearch = updatedCaseSensitivity
+            }
+
+            if shouldRunSearch {
+                runFind(direction: .forwards, shouldBeepOnNoMatch: shouldBeep)
+            }
+
+        case .setFindCaseSensitivity:
+            guard let isCaseSensitive =
+                userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue] as? Bool else {
+                return
+            }
+            isCaseSensitiveSearch = isCaseSensitive
         }
     }
 
@@ -638,6 +663,22 @@ struct DocumentWindowView: View {
         }
 
         return NSApp.keyWindow ?? NSApp.mainWindow
+    }
+
+    /// Publishes current Find query + mode so toolbar/panel UI can stay in sync.
+    private func publishFindStateChange() {
+        guard let hostWindow = currentHostWindow() else {
+            return
+        }
+
+        NotificationCenter.default.post(
+            name: .quickMarkdownViewerFindStateDidChange,
+            object: hostWindow,
+            userInfo: [
+                QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue: findQuery,
+                QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isCaseSensitiveSearch
+            ]
+        )
     }
 
     /// Opens the source Markdown file in the system's default plain-text editor.
