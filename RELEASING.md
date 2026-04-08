@@ -45,18 +45,19 @@ Important:
 - use normal `git commit` and `git push` so hooks run automatically
 - avoid `--no-verify` for normal workflows because it bypasses the hooks
 
-## 2. Build, sign, notarise, and package (scripted)
+## 2. Prepare release content before tagging
 
-### 2.0 Keep Apple Help content in sync
+Before building or tagging a release:
 
-If `README.md` changed since the previous release, refresh the Help Book copy
-before packaging:
-
-1. Update:
+1. Update release-facing source files as needed:
+   - `CHANGELOG.md`
+   - `README.md`
+   - `README.developers.md`
+   - app version metadata (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`; these feed `CFBundleShortVersionString` and `CFBundleVersion`)
+2. If `README.md` changed, refresh the bundled Help Book copy:
    - `QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/en.lproj/index.html`
    - `QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/index.html`
-   so both copies mirror the current public `README.md` content.
-2. Regenerate the Help index:
+3. Regenerate the Help index:
 
 ```bash
 hiutil -Caf \
@@ -64,9 +65,16 @@ hiutil -Caf \
   QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources
 ```
 
-This ensures the macOS Help menu search field can find up-to-date Help topics.
+If `README.md` did not change, you can skip steps 2 and 3.
 
-From repo root:
+4. Commit all release-content changes together.
+5. Create or update the release tag only after that final release-content commit.
+
+This ensures the tagged source matches the released app content, including bundled Help.
+
+## 3. Build, sign, notarise, and package (scripted)
+
+From repo root, after the final release-content commit and tag preparation:
 
 ```bash
 scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
@@ -87,7 +95,7 @@ TEAM_ID=YOUR_TEAM_ID \
 scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
 ```
 
-## 3. What the scripts do
+## 4. What the scripts do
 
 - `scripts/release/archive_and_export.sh`
   - Builds a Release archive.
@@ -101,7 +109,7 @@ scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
 - `scripts/release/make_signed_release.sh`
   - Runs both scripts in order.
 
-## 4. Output artefacts
+## 5. Output artefacts
 
 After a successful run:
 
@@ -109,7 +117,7 @@ After a successful run:
 - `dist/release/QuickMarkdownViewer-macOS.zip`
 - `dist/release/QuickMarkdownViewer-macOS-SHA256.txt`
 
-## 5. GitHub release upload checklist
+## 6. GitHub release upload checklist
 
 1. Create a new GitHub Release for the version tag.
 2. Upload:
@@ -117,7 +125,7 @@ After a successful run:
    - `QuickMarkdownViewer-macOS-SHA256.txt`
 3. In release notes, state that this build is officially signed and notarised.
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 - If archive/export fails with signing errors:
   - Recheck Team selection in Xcode for **Release**.
