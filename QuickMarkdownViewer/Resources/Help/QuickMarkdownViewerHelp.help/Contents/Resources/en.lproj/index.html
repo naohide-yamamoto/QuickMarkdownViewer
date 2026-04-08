@@ -158,12 +158,19 @@
   <ul>
     <li>Read-only Markdown viewing (no editing surface).</li>
     <li>One document per window.</li>
+    <li>Native customisable macOS toolbar with persisted layout/display mode.</li>
     <li>File open from:
       <ul>
         <li>double-click in Finder (when associated)</li>
         <li><code>File &gt; Open</code> (<code>⌘O</code>)</li>
         <li>drag and drop</li>
         <li><code>File &gt; Open Recent</code></li>
+      </ul>
+    </li>
+    <li>Native file sharing:
+      <ul>
+        <li><code>File &gt; Share</code> submenu</li>
+        <li>toolbar <code>Share</code> button</li>
       </ul>
     </li>
     <li>External links open in your default browser or mail app.</li>
@@ -174,9 +181,12 @@
         <li><code>⌘F</code> find</li>
         <li><code>⌘G</code> next</li>
         <li><code>Shift+⌘G</code> previous</li>
+        <li><code>⌘E</code> use selection for find</li>
+        <li><code>⌘J</code> jump to selection</li>
         <li>case-insensitive and case-sensitive modes</li>
       </ul>
     </li>
+    <li>With the toolbar hidden, <code>⌘F</code> opens a compact native find panel with the same query/mode state as toolbar search.</li>
     <li>Zoom controls:
       <ul>
         <li>zoom in/out</li>
@@ -184,9 +194,12 @@
         <li>zoom to fit</li>
       </ul>
     </li>
+    <li><code>View &gt; Hide Toolbar</code> / <code>Show Toolbar</code> (<code>⌥⌘T</code>) and <code>View &gt; Customise Toolbar…</code>.</li>
+    <li>Toolbar customisation supports drag/drop rearrangement, <code>Space</code>, and <code>Flexible Space</code>.</li>
     <li>Light/dark mode toggle.</li>
     <li>Print rendered Markdown (<code>⌘P</code>).</li>
     <li>Export rendered Markdown as PDF.</li>
+    <li>Native speech controls under <code>Edit &gt; Speech</code> (<code>Start Speaking</code> / <code>Stop Speaking</code>).</li>
     <li>View raw source in your default plain-text editor.</li>
   </ul>
 
@@ -196,9 +209,14 @@
     <li><code>⌘F</code>: find in document</li>
     <li><code>⌘G</code>: find next</li>
     <li><code>Shift+⌘G</code>: find previous</li>
+    <li><code>⌘E</code>: use selection for find</li>
+    <li><code>⌘J</code>: jump to selection</li>
     <li><code>⌘P</code>: print</li>
+    <li><code>⌘=</code>: zoom in</li>
+    <li><code>⌘-</code>: zoom out</li>
     <li><code>⌘0</code>: actual size (100%)</li>
     <li><code>⌘9</code>: zoom to fit</li>
+    <li><code>⌥⌘T</code>: hide/show toolbar</li>
     <li><code>Shift+⌘L</code>: toggle light/dark mode</li>
   </ul>
 
@@ -219,8 +237,14 @@
 
   <h2 id="known-issues">Known Issues</h2>
   <ul>
-    <li>Native macOS Help Viewer integration currently fails on some systems with the message &lsquo;The selected content is currently unavailable&rsquo;.</li>
+    <li>Native macOS Help Viewer integration currently fails on some systems with the message &lsquo;The selected content is currently unavailable&rsquo;, even when Help-book registration calls report success.</li>
     <li>Current practical behaviour: <code>Help &gt; Quick Markdown Viewer Help</code> opens bundled in-app Help content directly instead of relying on Help Viewer page loading.</li>
+    <li>Native toolbar customisation has deferred behaviour gaps:
+      <ul>
+        <li>Right-clicking an existing toolbar item may not show <code>Remove Item</code>, even though <code>View &gt; Customise Toolbar…</code> still supports removing items.</li>
+        <li><code>Flexible Space</code> may not visibly resize with window width changes in some toolbar layouts. This behaviour is also seen in Apple&rsquo;s Preview on the same macOS version and is currently treated as system-level/AppKit style interaction.</li>
+      </ul>
+    </li>
   </ul>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
@@ -243,7 +267,7 @@
 
   <h2 id="support">Support</h2>
   <p>For bug reports, feature requests, and general help, please use this repository&rsquo;s GitHub Issues page.</p>
-  <p>For other project-related enquiries, you can also contact Naohide Yamamoto at <a href="mailto:hello@quickmarkdownviewer.app">hello@quickmarkdownviewer.app</a>.</p>
+  <p>For other project-related enquiries, please email <a href="mailto:hello@quickmarkdownviewer.app">hello@quickmarkdownviewer.app</a>.</p>
   <p class="subtle">Support is provided on a best-effort basis.</p>
 </body>
 </html>
