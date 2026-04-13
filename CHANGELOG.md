@@ -6,6 +6,14 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Added
+- App-menu `Check for Updates…` command under `Quick Markdown Viewer`, with native result dialogs.
+- Optional automatic update checking (off by default) that only requests GitHub release metadata.
+- Settings window with:
+  - `General` pane for update-check preferences
+  - `Appearance` pane for window-background controls
+  - pane-scoped reset for Appearance plus a global reset action in General
+
 ### Fixed
 - Removed first-document open background flashing on app launch by restoring the stable v1.0.5 load transition path and resolving light/dark background colours in CSS rather than SwiftUI render-time state.
 

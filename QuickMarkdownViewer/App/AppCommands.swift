@@ -1,4 +1,15 @@
+import AppKit
 import SwiftUI
+
+@available(macOS 14.0, *)
+private struct SettingsMenuButton: View {
+    var body: some View {
+        SettingsLink {
+            Label("Settings…", systemImage: "gearshape")
+        }
+        .keyboardShortcut(",", modifiers: .command)
+    }
+}
 
 /// Defines app-wide menu commands.
 ///
@@ -7,6 +18,13 @@ import SwiftUI
 struct AppCommands: Commands {
     /// Router used to trigger app-level actions from menu commands.
     @ObservedObject var routing: AppRouting
+
+    /// Fallback settings opener for older macOS deployment targets.
+    private func openSettingsWindowLegacy() {
+        if !NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil) {
+            _ = NSApp.sendAction(Selector(("showPreferencesWindow:")), to: nil, from: nil)
+        }
+    }
 
     var body: some Commands {
         // Replace "New" with "Open…" because this app is a viewer,
@@ -274,7 +292,31 @@ struct AppCommands: Commands {
             .keyboardShortcut("l", modifiers: [.command, .shift])
         }
 
-        // QuickMarkdownViewer v1 intentionally ships without a settings/preferences UI.
+        // Place Settings directly under About in the app menu, with explicit
+        // separators so the top app-menu cluster mirrors native macOS layout.
+        CommandGroup(after: .appInfo) {
+            Divider()
+
+            if #available(macOS 14.0, *) {
+                SettingsMenuButton()
+            } else {
+                Button(action: openSettingsWindowLegacy) {
+                    Label("Settings…", systemImage: "gearshape")
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+
+            Button(action: {
+                routing.checkForUpdatesManually()
+            }) {
+                Label("Check for Updates…", systemImage: "arrow.triangle.2.circlepath")
+            }
+
+            Divider()
+        }
+
+        // Remove the default app-settings insertion point so Settings appears
+        // only in the custom location above (between About and Services).
         CommandGroup(replacing: .appSettings) {}
 
         // Provide a concrete Help action routed through Apple Help Book APIs.

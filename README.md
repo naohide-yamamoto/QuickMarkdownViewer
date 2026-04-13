@@ -61,6 +61,8 @@ Quick Markdown Viewer accepts:
 - `.mkdn`
 - `.mdwn`
 
+If you select Quick Markdown Viewer as the default Markdown viewer in Settings (`⌘,`), macOS applies that choice to its grouped Markdown types (currently `.md` and `.markdown`).
+
 Quick Markdown Viewer intentionally does not support:
 - `.rmd`
 - `.qmd`
@@ -80,6 +82,7 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - Read-only Markdown viewing (no editing surface).
 - One document per window.
 - Native customisable macOS toolbar with persisted layout/display mode.
+- Native Settings window (`⌘,`) with General and Appearance panes for preferences.
 - File open from:
   - double-click in Finder (when associated)
   - `File > Open` (`⌘O`)
@@ -110,10 +113,14 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - Export rendered Markdown as PDF.
 - Native speech controls under `Edit > Speech` (`Start Speaking` / `Stop Speaking`).
 - View raw source in your default plain-text editor.
+- `Check for Updates…` in the app menu, with optional automatic checking.
+  - Automatic checking is off by default.
+  - When enabled, Quick Markdown Viewer contacts GitHub only to fetch release metadata.
 
 ## Keyboard Shortcuts
 
 - `⌘O`: open file
+- `⌘,`: open Settings
 - `⌘F`: find in document
 - `⌘G`: find next
 - `Shift+⌘G`: find previous
@@ -158,6 +165,8 @@ You are responsible for reviewing, building, and using the software at your own 
 - Native toolbar customisation has deferred behaviour gaps:
   - Right-clicking an existing toolbar item may not show `Remove Item`, even though `View > Customise Toolbar…` still supports removing items.
   - `Flexible Space` may not visibly resize with window width changes in some toolbar layouts. This behaviour is also seen in Apple's Preview on the same macOS version and is currently treated as system-level/AppKit style interaction.
+- On some macOS builds, the app menu `Settings…` item may still display the generic gear icon even when Quick Markdown Viewer requests `gearshape`.
+- Default-app association UI may not live-refresh across open windows. For example, changing the Markdown default app in Quick Markdown Viewer Settings may not immediately update an already-open Finder `Get Info` panel, and changing it in Finder may not immediately update an already-open Quick Markdown Viewer Settings pane.
 
 ## Troubleshooting
 
@@ -174,7 +183,7 @@ Quick Markdown Viewer is not:
 - a knowledge base or file-browser workspace
 - an IDE-style tool
 
-There are no tabs, plugins, cloud sync, collaborative features, or advanced authoring workflows.
+There are no multi-document panes, plugins, cloud sync, collaborative features, or advanced authoring workflows.
 
 ## Support
 

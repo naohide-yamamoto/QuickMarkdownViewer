@@ -1,6 +1,8 @@
 import AppKit
 import Combine
+import CoreServices
 import SwiftUI
+import UniformTypeIdentifiers
 import WebKit
 
 /// Notification posted when the app-level Find commands should act on a window.
@@ -173,6 +175,7 @@ final class QuickMarkdownViewerAppDelegate: NSObject, NSApplicationDelegate {
         flushPendingFilesIfNeeded()
         retargetMainMenuDocumentActionsIfNeeded()
         scheduleInitialEmptyWindowIfNeeded()
+        AppRouting.shared.checkForUpdatesAutomaticallyIfEnabled()
     }
 
     /// Handles modern URL-based open events from Finder and Dock.
@@ -436,6 +439,39 @@ final class AppRouting: ObservableObject {
         /// Document URL associated with this menu snapshot.
         let fileURL: URL
     }
+
+    /// One selectable app option for "Default Markdown viewer" in Settings.
+    struct MarkdownViewerAppOption: Identifiable {
+        /// App bundle identifier used for LaunchServices association.
+        let id: String
+
+        /// User-facing app name shown in Settings.
+        let displayName: String
+
+        /// App icon shown in the default-viewer picker.
+        let icon: NSImage
+    }
+
+    /// User-facing appearance preference used in Settings.
+    enum AppearancePreference: String, CaseIterable, Identifiable {
+        case system
+        case light
+        case dark
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .system:
+                return "System"
+            case .light:
+                return "Light"
+            case .dark:
+                return "Dark"
+            }
+        }
+    }
+
     /// Shared router instance used by SwiftUI commands and AppKit delegate flow.
     static let shared = AppRouting()
 
@@ -460,6 +496,35 @@ final class AppRouting: ObservableObject {
         case unsupportedFileType
     }
 
+    /// Source of an update check request.
+    private enum UpdateCheckTrigger {
+        /// Explicit user action from menu/settings.
+        case manual
+
+        /// Optional background check controlled by Settings.
+        case automatic
+    }
+
+    /// `releases/latest` payload returned by GitHub API.
+    private struct LatestGitHubRelease: Decodable {
+        let tagName: String
+        let htmlURL: URL
+
+        private enum CodingKeys: String, CodingKey {
+            case tagName = "tag_name"
+            case htmlURL = "html_url"
+        }
+    }
+
+    /// Result of comparing installed app version and latest release metadata.
+    private enum UpdateCheckResult {
+        /// Installed version is current or newer than remote metadata.
+        case upToDate(installedVersion: String)
+
+        /// A newer release exists.
+        case updateAvailable(installedVersion: String, latestVersion: String, releaseURL: URL)
+    }
+
     /// Service that validates and reads Markdown files.
     private let fileOpenService = FileOpenService()
 
@@ -475,8 +540,27 @@ final class AppRouting: ObservableObject {
     /// Defaults key storing the last user-selected appearance mode.
     private let appearanceModeDefaultsKey = "QuickMarkdownViewer.AppearanceMode.v1"
 
+    /// Defaults key storing timestamp of last automatic update check.
+    private let automaticUpdateLastCheckDateDefaultsKey =
+        "QuickMarkdownViewer.AutomaticUpdateCheck.LastCheckedAt.v1"
+
+    /// Defaults key storing last directory used by the app chooser panel.
+    private let defaultViewerOpenPanelLastDirectoryDefaultsKey =
+        "QuickMarkdownViewer.DefaultViewerOpenPanel.LastDirectory.v1"
+
+    /// GitHub API endpoint used for manual/automatic update checks.
+    private let latestReleaseAPIURL = URL(
+        string: "https://api.github.com/repos/naohide-yamamoto/QuickMarkdownViewer/releases/latest"
+    )
+
+    /// Minimum interval between automatic update checks.
+    private let automaticUpdateCheckInterval: TimeInterval = 60 * 60 * 24
+
     /// Defaults store used for tiny viewer preferences.
     private let defaults: UserDefaults
+
+    /// True while one update check task is currently in flight.
+    private var isCheckingForUpdates = false
 
     /// Strong references for open windows.
     ///
@@ -580,6 +664,174 @@ final class AppRouting: ObservableObject {
             "Opening bundled in-app help view (book name '\(helpBookName)', id: \(helpBookIdentifier))."
         )
         openBundledHelpFallbackSilently()
+    }
+
+    /// Runs an on-demand update check and always reports the result to users.
+    func checkForUpdatesManually() {
+        performUpdateCheck(trigger: .manual)
+    }
+
+    /// Runs an automatic update check when enabled in Settings.
+    ///
+    /// Automatic checks are throttled to avoid excessive network requests
+    /// during frequent app relaunches.
+    func checkForUpdatesAutomaticallyIfEnabled() {
+        guard defaults.bool(forKey: AppPreferenceKey.automaticUpdateCheckEnabled) else {
+            return
+        }
+
+        let now = Date()
+        if let lastChecked = defaults.object(forKey: automaticUpdateLastCheckDateDefaultsKey) as? Date,
+           now.timeIntervalSince(lastChecked) < automaticUpdateCheckInterval {
+            return
+        }
+
+        defaults.set(now, forKey: automaticUpdateLastCheckDateDefaultsKey)
+        performUpdateCheck(trigger: .automatic)
+    }
+
+    /// Clears persisted appearance override so app follows system appearance.
+    func resetAppearancePreferenceToSystemDefault() {
+        setAppearancePreferenceForSettings(.system)
+    }
+
+    /// Returns the current appearance preference used by Settings.
+    func appearancePreferenceForSettings() -> AppearancePreference {
+        guard let persistedMode = persistedAppearanceMode() else {
+            return .system
+        }
+
+        switch persistedMode {
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
+
+    /// Applies appearance preference selected in Settings.
+    func setAppearancePreferenceForSettings(_ preference: AppearancePreference) {
+        switch preference {
+        case .system:
+            defaults.removeObject(forKey: appearanceModeDefaultsKey)
+            NSApp.appearance = nil
+
+        case .light:
+            setPersistedAppearanceMode(.light)
+            applyAppearance(.light)
+
+        case .dark:
+            setPersistedAppearanceMode(.dark)
+            applyAppearance(.dark)
+        }
+    }
+
+    /// Returns all installed app options suitable for Markdown-file association.
+    func markdownViewerAppOptions() -> [MarkdownViewerAppOption] {
+        let associatedBundleID = defaultMarkdownViewerBundleIdentifier()
+        var bundleIdentifiers = Set<String>()
+
+        // Collect handlers advertised for each supported Markdown extension.
+        for contentTypeIdentifier in markdownContentTypeIdentifiers() {
+            for role in [LSRolesMask.all, .viewer, .editor] {
+                if let handlers =
+                    LSCopyAllRoleHandlersForContentType(contentTypeIdentifier as CFString, role)?
+                        .takeRetainedValue() as? [String] {
+                    handlers.forEach { bundleIdentifiers.insert($0) }
+                }
+            }
+        }
+
+        if let associatedBundleID {
+            bundleIdentifiers.insert(associatedBundleID)
+        }
+
+        if let ownBundleID = Bundle.main.bundleIdentifier {
+            bundleIdentifiers.insert(ownBundleID)
+        }
+
+        let options = bundleIdentifiers.compactMap { bundleID -> MarkdownViewerAppOption? in
+            guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+                return nil
+            }
+
+            let displayName = appDisplayName(for: appURL, bundleIdentifier: bundleID)
+            let appIcon = NSWorkspace.shared.icon(forFile: appURL.path)
+            appIcon.size = NSSize(width: 16, height: 16)
+            return MarkdownViewerAppOption(id: bundleID, displayName: displayName, icon: appIcon)
+        }
+            .sorted { lhs, rhs in
+                lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            }
+
+        return options
+    }
+
+    /// Returns the current system-associated Markdown viewer bundle identifier.
+    func defaultMarkdownViewerBundleIdentifier() -> String? {
+        for contentTypeIdentifier in markdownContentTypeIdentifiers(primaryOnly: true) {
+            if let bundleID = defaultRoleHandlerBundleIdentifier(for: contentTypeIdentifier) {
+                return bundleID
+            }
+        }
+
+        for contentTypeIdentifier in markdownContentTypeIdentifiers() {
+            if let bundleID = defaultRoleHandlerBundleIdentifier(for: contentTypeIdentifier) {
+                return bundleID
+            }
+        }
+
+        return nil
+    }
+
+    /// Sets selected app as the system-associated Markdown viewer.
+    func setDefaultMarkdownViewer(bundleIdentifier: String) {
+        // Use the primary Markdown content type only (`.md`) so macOS presents
+        // one consolidated default-app confirmation instead of a cascade of
+        // per-extension prompts.
+        guard let primaryContentTypeIdentifier = markdownContentTypeIdentifiers(primaryOnly: true).first else {
+            showDefaultMarkdownViewerAssociationFailureAlert()
+            return
+        }
+
+        guard setDefaultRoleHandler(
+            forContentTypeIdentifier: primaryContentTypeIdentifier,
+            bundleIdentifier: bundleIdentifier
+        ) else {
+            showDefaultMarkdownViewerAssociationFailureAlert()
+            return
+        }
+    }
+
+    /// Prompts users to pick an app from `/Applications` for Markdown viewing.
+    ///
+    /// Returns the selected app bundle identifier, or `nil` on cancel/failure.
+    func promptForDefaultMarkdownViewerSelection() -> String? {
+        let panel = NSOpenPanel()
+        panel.title = "Select Markdown Viewer"
+        panel.message = ""
+        panel.prompt = "Select"
+        panel.directoryURL = defaultViewerOpenPanelDirectoryURL() ??
+            URL(fileURLWithPath: "/Applications", isDirectory: true)
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+
+        guard panel.runModal() == .OK,
+              let appURL = panel.url else {
+            return nil
+        }
+
+        guard let bundleIdentifier = Bundle(url: appURL)?.bundleIdentifier,
+              !bundleIdentifier.isEmpty else {
+            showDefaultMarkdownViewerAssociationFailureAlert()
+            return nil
+        }
+
+        persistDefaultViewerOpenPanelDirectory(appURL.deletingLastPathComponent())
+
+        return bundleIdentifier
     }
 
     /// Opens each file URL in its own window.
@@ -1503,6 +1755,300 @@ final class AppRouting: ObservableObject {
             userInfo: [
                 QuickMarkdownViewerDocumentCommandUserInfoKey.command.rawValue: command.rawValue
             ]
+        )
+    }
+
+    /// Launches one update-check task and routes result to appropriate UI.
+    private func performUpdateCheck(trigger: UpdateCheckTrigger) {
+        guard !isCheckingForUpdates else {
+            if trigger == .manual {
+                let alert = NSAlert()
+                alert.alertStyle = .informational
+                alert.messageText = "Update check already in progress."
+                alert.informativeText = "Please wait a moment, then try again."
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+            return
+        }
+
+        guard let latestReleaseAPIURL else {
+            if trigger == .manual {
+                let alert = NSAlert()
+                alert.alertStyle = .warning
+                alert.messageText = "Update check is unavailable."
+                alert.informativeText = "Could not resolve the GitHub release URL."
+                alert.addButton(withTitle: "OK")
+                alert.runModal()
+            }
+            return
+        }
+
+        isCheckingForUpdates = true
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let latestRelease = try await self.fetchLatestRelease(from: latestReleaseAPIURL)
+
+                await MainActor.run {
+                    let result = self.resolveUpdateCheckResult(from: latestRelease)
+                    self.presentUpdateCheckResult(result, trigger: trigger)
+                    self.isCheckingForUpdates = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.isCheckingForUpdates = false
+
+                    if trigger == .manual {
+                        let alert = NSAlert()
+                        alert.alertStyle = .warning
+                        alert.messageText = "Could not check for updates."
+                        alert.informativeText =
+                            "Quick Markdown Viewer could not reach GitHub release metadata.\n\n\(error.localizedDescription)"
+                        alert.addButton(withTitle: "OK")
+                        alert.runModal()
+                    } else {
+                        Logger.error("Automatic update check failed: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    /// Fetches latest-release metadata from GitHub.
+    private func fetchLatestRelease(from url: URL) async throws -> LatestGitHubRelease {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = 15
+        request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        request.setValue("QuickMarkdownViewer", forHTTPHeaderField: "User-Agent")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw URLError(.badServerResponse)
+        }
+
+        return try JSONDecoder().decode(LatestGitHubRelease.self, from: data)
+    }
+
+    /// Compares installed and latest-release versions.
+    private func resolveUpdateCheckResult(from latestRelease: LatestGitHubRelease) -> UpdateCheckResult {
+        let installedVersion = installedAppVersion()
+        let latestVersion = normalizedVersionString(latestRelease.tagName)
+
+        if compareVersionNumbers(latestVersion, installedVersion) == .orderedDescending {
+            return .updateAvailable(
+                installedVersion: installedVersion,
+                latestVersion: latestVersion,
+                releaseURL: latestRelease.htmlURL
+            )
+        }
+
+        return .upToDate(installedVersion: installedVersion)
+    }
+
+    /// Presents update-check results according to check trigger type.
+    private func presentUpdateCheckResult(_ result: UpdateCheckResult, trigger: UpdateCheckTrigger) {
+        switch result {
+        case .upToDate(let installedVersion):
+            guard trigger == .manual else {
+                return
+            }
+
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = "Quick Markdown Viewer is up to date."
+            alert.informativeText = "Installed version: \(installedVersion)"
+            alert.addButton(withTitle: "OK")
+            alert.runModal()
+
+        case .updateAvailable(let installedVersion, let latestVersion, let releaseURL):
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = "A new version is available."
+            alert.informativeText =
+                "Installed version: \(installedVersion)\nLatest version: \(latestVersion)\n\nTo update, open the GitHub Releases page and download the new build."
+            alert.addButton(withTitle: "Open Releases Page")
+            alert.addButton(withTitle: "Later")
+
+            if alert.runModal() == .alertFirstButtonReturn {
+                NSWorkspace.shared.open(releaseURL)
+            }
+        }
+    }
+
+    /// Returns installed app version shown to users.
+    private func installedAppVersion() -> String {
+        if let shortVersion = Bundle.main.object(
+            forInfoDictionaryKey: "CFBundleShortVersionString"
+        ) as? String,
+           !shortVersion.isEmpty {
+            return normalizedVersionString(shortVersion)
+        }
+
+        return "0.0.0"
+    }
+
+    /// Normalises optional leading `v` prefix from semantic version strings.
+    private func normalizedVersionString(_ rawValue: String) -> String {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.lowercased().hasPrefix("v") {
+            return String(trimmed.dropFirst())
+        }
+        return trimmed
+    }
+
+    /// Compares semantic-style dotted versions numerically.
+    private func compareVersionNumbers(_ lhs: String, _ rhs: String) -> ComparisonResult {
+        let lhsComponents = numericVersionComponents(from: lhs)
+        let rhsComponents = numericVersionComponents(from: rhs)
+        let maxCount = max(lhsComponents.count, rhsComponents.count)
+
+        for index in 0..<maxCount {
+            let lhsValue = index < lhsComponents.count ? lhsComponents[index] : 0
+            let rhsValue = index < rhsComponents.count ? rhsComponents[index] : 0
+
+            if lhsValue < rhsValue { return .orderedAscending }
+            if lhsValue > rhsValue { return .orderedDescending }
+        }
+
+        return .orderedSame
+    }
+
+    /// Extracts numeric components from a semantic version string.
+    private func numericVersionComponents(from version: String) -> [Int] {
+        let normalized = normalizedVersionString(version)
+        let rawSegments = normalized.split(separator: ".")
+
+        return rawSegments.map { segment in
+            let digits = segment.prefix { $0.isNumber }
+            return Int(digits) ?? 0
+        }
+    }
+
+    /// Returns Markdown content-type identifiers used for app association.
+    ///
+    /// By default this includes all supported Markdown extensions. When
+    /// `primaryOnly` is true, only the `.md` content type is returned.
+    private func markdownContentTypeIdentifiers(primaryOnly: Bool = false) -> [String] {
+        let extensions = primaryOnly
+            ? ["md"]
+            : FileOpenService.allowedExtensionsInDisplayOrder
+
+        var orderedIdentifiers: [String] = []
+        var seenIdentifiers = Set<String>()
+
+        for fileExtension in extensions {
+            if let type = UTType(filenameExtension: fileExtension) {
+                let identifier = type.identifier
+                if !seenIdentifiers.contains(identifier) {
+                    seenIdentifiers.insert(identifier)
+                    orderedIdentifiers.append(identifier)
+                }
+            }
+        }
+
+        // Ensure the canonical Markdown UTI is considered as a fallback.
+        let canonicalMarkdownIdentifier = "net.daringfireball.markdown"
+        if !seenIdentifiers.contains(canonicalMarkdownIdentifier) {
+            orderedIdentifiers.append(canonicalMarkdownIdentifier)
+        }
+
+        return orderedIdentifiers
+    }
+
+    /// Returns current default handler bundle identifier for one content type.
+    private func defaultRoleHandlerBundleIdentifier(for contentTypeIdentifier: String) -> String? {
+        for role in [LSRolesMask.all, .viewer, .editor] {
+            if let bundleID =
+                LSCopyDefaultRoleHandlerForContentType(contentTypeIdentifier as CFString, role)?
+                .takeRetainedValue() as String?,
+               !bundleID.isEmpty {
+                return bundleID
+            }
+        }
+
+        return nil
+    }
+
+    /// Applies default app handler for one content type.
+    private func setDefaultRoleHandler(
+        forContentTypeIdentifier contentTypeIdentifier: String,
+        bundleIdentifier: String
+    ) -> Bool {
+        let status = LSSetDefaultRoleHandlerForContentType(
+            contentTypeIdentifier as CFString,
+            .all,
+            bundleIdentifier as CFString
+        )
+
+        guard status == noErr else {
+            Logger.error(
+                "Failed to set default Markdown handler for content type \(contentTypeIdentifier), bundle \(bundleIdentifier): status \(status)"
+            )
+            return false
+        }
+
+        return true
+    }
+
+    /// Returns a user-facing app name for one bundle/application URL.
+    private func appDisplayName(for appURL: URL, bundleIdentifier: String) -> String {
+        if let appBundle = Bundle(url: appURL) {
+            if let displayName = appBundle.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+               !displayName.isEmpty {
+                return displayName
+            }
+
+            if let bundleName = appBundle.object(forInfoDictionaryKey: "CFBundleName") as? String,
+               !bundleName.isEmpty {
+                return bundleName
+            }
+        }
+
+        let fallbackDisplayName = FileManager.default.displayName(atPath: appURL.path)
+        if !fallbackDisplayName.isEmpty {
+            return fallbackDisplayName
+        }
+
+        return bundleIdentifier
+    }
+
+    /// Presents a warning when Markdown-viewer association could not be changed.
+    private func showDefaultMarkdownViewerAssociationFailureAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Could not set the default Markdown viewer."
+        alert.informativeText =
+            "Quick Markdown Viewer could not update macOS file association settings for Markdown files."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    /// Returns the last directory used by the default-viewer app chooser.
+    private func defaultViewerOpenPanelDirectoryURL() -> URL? {
+        guard
+            let storedPath = defaults.string(forKey: defaultViewerOpenPanelLastDirectoryDefaultsKey),
+            !storedPath.isEmpty
+        else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: storedPath, isDirectory: true)
+    }
+
+    /// Persists the directory used by the default-viewer app chooser.
+    private func persistDefaultViewerOpenPanelDirectory(_ directoryURL: URL) {
+        defaults.set(
+            directoryURL.standardizedFileURL.path,
+            forKey: defaultViewerOpenPanelLastDirectoryDefaultsKey
         )
     }
 

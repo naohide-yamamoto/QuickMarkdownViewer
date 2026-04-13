@@ -44,6 +44,8 @@ Quick Markdown Viewer v1 is intentionally minimal:
 - Native customisable AppKit toolbar (`NSToolbar`) with persisted item layout/display mode
 - Toolbar hide/show (`⌥⌘T`) and toolbar customisation (`View > Customise Toolbar…`)
 - Compact native Find panel when toolbar search is unavailable (for example, toolbar hidden)
+- Native Settings window with General/Appearance panes
+- Manual `Check for Updates…` plus optional automatic release-metadata checks
 
 ## Non-goals
 
@@ -54,7 +56,7 @@ Quick Markdown Viewer is **not**:
 - a file browser or tabbed workspace
 - an IDE-style tool
 
-No live preview, plugin system, command palette, preferences window, or sync features are included.
+No live preview, plugin system, command palette, or sync features are included.
 
 ## Build and Run
 
@@ -195,6 +197,8 @@ Quick Markdown Viewer currently accepts:
 - `.mkdn`
 - `.mdwn`
 
+Selecting Quick Markdown Viewer as the default Markdown viewer in Settings (`⌘,`) updates the Launch Services handler for the primary Markdown content type. On current macOS builds, this is confirmed once and applied to grouped Markdown extensions (observed: `.md` and `.markdown`).
+
 Quick Markdown Viewer intentionally does **not** support:
 - `.rmd`
 - `.qmd`
@@ -232,6 +236,11 @@ passthrough from Markdown input is disabled in the renderer configuration.
 External `http`, `https`, and `mailto` links are opened only when the user
 explicitly clicks them, at which point they are handed off to the system
 browser or mail app rather than rendered inside Quick Markdown Viewer.
+
+Update checks follow the same opt-in principle:
+- `Check for Updates…` performs a user-initiated request to GitHub release metadata.
+- Automatic update checking is off by default.
+- If users enable automatic checking in Settings, Quick Markdown Viewer contacts GitHub only to fetch release metadata and does not download/install updates automatically.
 
 ## Licence
 
@@ -288,6 +297,15 @@ own risk.
   - Current status: observed in Quick Markdown Viewer and also in Preview (v11.0 on macOS 26.3.1), suggesting AppKit/system-style behaviour rather than app-specific layout logic.
   - Current workaround: if fixed-width spacing is needed, users can insert multiple `Space` items in toolbar customisation.
   - Future work: revisit toolbar implementation details (especially grouped-item composition and style interactions) in a dedicated post-v1.0.5 pass.
+- App-menu `Settings…` icon may still appear as generic `gear` on some macOS builds.
+  - Symptom: menu shows `gear` even when Quick Markdown Viewer requests `gearshape`.
+  - Current status: persists after switching to `SettingsLink` and applying AppKit menu-item icon overrides at launch/activation.
+  - Current workaround: functional impact is none (menu action and shortcut still work); this is visual-only.
+- Markdown default-app association UI can lag when changed externally.
+  - Symptom: with Quick Markdown Viewer Settings already open, changing `.md` association in Finder `Get Info` may not immediately refresh the picker; likewise, with Finder `Get Info` already open, changing association in Quick Markdown Viewer may not immediately refresh Finder's displayed app.
+  - Current status: actual Launch Services association is updated correctly, but already-open UI panels can display stale values until refreshed/reopened.
+  - Current workaround: close/reopen the affected pane/window to refresh displayed association state.
+  - Assessment: treated as a macOS/Launch Services UI refresh boundary, not an app-specific association-write failure.
 
 ## Notes
 
@@ -301,6 +319,12 @@ own risk.
   - `⌘P` prints rendered Markdown content.
   - `File > Export as PDF…` exports rendered Markdown content as PDF.
   - `File > View Source` opens the raw `.md` in the system default plain-text editor.
+  - `Quick Markdown Viewer > Check for Updates…` checks GitHub release metadata.
+- Settings commands:
+  - `⌘,` opens the Settings window.
+  - `General` pane controls manual/automatic update-check preferences.
+  - `Appearance` pane controls window-background size/colour.
+  - `Reset All Settings` in General restores all settings across panes.
 - Speech commands:
   - `Edit > Speech > Start Speaking` reads selected text, or full document text if nothing is selected.
   - `Edit > Speech > Stop Speaking` stops active speech for the current window.

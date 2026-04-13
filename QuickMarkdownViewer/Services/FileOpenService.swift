@@ -27,6 +27,10 @@ enum FileOpenError: LocalizedError {
 /// - Extension checks
 /// - Basic multi-encoding text decode
 struct FileOpenService {
+    /// Defaults key storing last directory used by the Markdown file chooser.
+    private static let markdownOpenPanelLastDirectoryDefaultsKey =
+        "qmv.markdownOpenPanel.lastDirectory.v1"
+
     /// Supported Markdown extensions in the preferred display order.
     ///
     /// We keep this as an ordered list so user-facing warnings can present the
@@ -74,6 +78,7 @@ struct FileOpenService {
         panel.allowsMultipleSelection = true
         panel.resolvesAliases = true
         panel.allowsOtherFileTypes = false
+        panel.directoryURL = persistedOpenPanelDirectoryURL()
 
         // Prefer UTType-based filtering on modern macOS.
         if #available(macOS 12.0, *) {
@@ -82,7 +87,16 @@ struct FileOpenService {
             panel.allowedFileTypes = Self.allowedExtensionsInDisplayOrder
         }
 
-        return panel.runModal() == .OK ? panel.urls : nil
+        guard panel.runModal() == .OK else {
+            return nil
+        }
+
+        let selectedURLs = panel.urls
+        if let firstSelectedURL = selectedURLs.first {
+            persistOpenPanelDirectory(from: firstSelectedURL)
+        }
+
+        return selectedURLs
     }
 
     /// Returns true when the URL extension is one QuickMarkdownViewer can render.
@@ -143,5 +157,31 @@ struct FileOpenService {
     @available(macOS 12.0, *)
     private static var allowedUTTypes: [UTType] {
         allowedExtensionsInDisplayOrder.compactMap { UTType(filenameExtension: $0) }
+    }
+
+    /// Returns the last directory used by the Markdown chooser, when present.
+    private func persistedOpenPanelDirectoryURL() -> URL? {
+        guard
+            let storedPath = UserDefaults.standard.string(
+                forKey: Self.markdownOpenPanelLastDirectoryDefaultsKey
+            ),
+            !storedPath.isEmpty
+        else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: storedPath, isDirectory: true)
+    }
+
+    /// Stores the directory that should seed the next Markdown chooser open.
+    private func persistOpenPanelDirectory(from selectedURL: URL) {
+        let directoryURL = selectedURL.hasDirectoryPath
+            ? selectedURL
+            : selectedURL.deletingLastPathComponent()
+
+        UserDefaults.standard.set(
+            directoryURL.standardizedFileURL.path,
+            forKey: Self.markdownOpenPanelLastDirectoryDefaultsKey
+        )
     }
 }
