@@ -80,6 +80,16 @@ struct DocumentWindowView: View {
         AppPreferenceKey.windowBackgroundColorDarkHex
     ) private var windowBackgroundColorDarkHex = AppPreferenceDefault.windowBackgroundColorDarkHex
 
+    /// True when syntax highlighting is enabled for fenced code blocks.
+    @AppStorage(
+        AppPreferenceKey.syntaxHighlightingEnabled
+    ) private var syntaxHighlightingEnabled = AppPreferenceDefault.syntaxHighlightingEnabled
+
+    /// Selected syntax-highlight theme family.
+    @AppStorage(
+        AppPreferenceKey.syntaxHighlightingTheme
+    ) private var syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
+
     /// Sanitised visibility value applied to web rendering.
     private var clampedWindowBackgroundVisibility: Double {
         max(0.0, min(1.0, windowBackgroundVisibility))
@@ -199,7 +209,9 @@ struct DocumentWindowView: View {
                     searchBridge: webViewSearchBridge,
                     windowBackgroundVisibility: clampedWindowBackgroundVisibility,
                     windowBackgroundColorLightHex: windowBackgroundColorLightHex,
-                    windowBackgroundColorDarkHex: windowBackgroundColorDarkHex
+                    windowBackgroundColorDarkHex: windowBackgroundColorDarkHex,
+                    syntaxHighlightingEnabled: syntaxHighlightingEnabled,
+                    syntaxHighlightingThemeRawValue: syntaxHighlightingThemeRawValue
                 )
             } else {
                 Text("Couldn’t open this Markdown file.")

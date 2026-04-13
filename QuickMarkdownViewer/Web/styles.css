@@ -163,9 +163,29 @@ pre {
 }
 
 pre code {
+  display: block;
+  overflow-x: auto;
   background: transparent;
   padding: 0;
   border-radius: 0;
+}
+
+/* Keep highlight.js theme integration aligned with Quick Markdown Viewer code-block layout. */
+pre code.hljs,
+code.hljs {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+/*
+  Keep geometry stable when syntax highlighting is toggled.
+  Some bundled highlight.js themes style emphasis/strong tokens with italics/bold,
+  which can subtly change wrapping/height in narrow code blocks.
+*/
+pre code.hljs *,
+code.hljs * {
+  font-style: normal !important;
+  font-weight: inherit !important;
 }
 
 /* Block-level elements */
@@ -321,6 +341,12 @@ hr {
     word-break: break-word !important;
   }
 
+  /* Keep print output clean while preserving syntax colours. */
+  .hljs,
+  .hljs * {
+    background: transparent !important;
+  }
+
   img {
     max-width: 100% !important;
     page-break-inside: avoid !important;
@@ -360,6 +386,12 @@ body.qmv-print-output pre {
   overflow: visible !important;
   white-space: pre-wrap !important;
   word-break: break-word !important;
+}
+
+/* Keep exported PDF output clean while preserving syntax colours. */
+body.qmv-print-output .hljs,
+body.qmv-print-output .hljs * {
+  background: transparent !important;
 }
 
 body.qmv-print-output table {

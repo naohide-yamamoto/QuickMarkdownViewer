@@ -1,5 +1,6 @@
 import SwiftUI
 import Darwin
+import WebKit
 
 /// User-default keys backing app-level settings.
 enum AppPreferenceKey {
@@ -18,6 +19,12 @@ enum AppPreferenceKey {
 
     /// True when automatic release-metadata checks are enabled.
     static let automaticUpdateCheckEnabled = "qmv.automaticUpdateCheckEnabled"
+
+    /// True when fenced-code syntax highlighting is enabled.
+    static let syntaxHighlightingEnabled = "qmv.syntaxHighlightingEnabled"
+
+    /// Selected syntax-highlighting theme family.
+    static let syntaxHighlightingTheme = "qmv.syntaxHighlightingTheme"
 }
 
 /// Default values for app-level settings.
@@ -33,6 +40,39 @@ enum AppPreferenceDefault {
 
     /// Default update-check mode: manual only.
     static let automaticUpdateCheckEnabled = false
+
+    /// Default syntax-highlighting mode: off.
+    static let syntaxHighlightingEnabled = false
+
+    /// Default syntax-highlighting theme: GitHub.
+    static let syntaxHighlightingTheme = SyntaxHighlightTheme.github.rawValue
+}
+
+/// Available syntax-highlighting theme families.
+enum SyntaxHighlightTheme: String, CaseIterable, Identifiable {
+    case github
+    case vscode
+    case atomOne
+    case stackOverflow
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .github:
+            return "GitHub"
+        case .vscode:
+            return "VS Code"
+        case .atomOne:
+            return "Atom One"
+        case .stackOverflow:
+            return "Stack Overflow"
+        }
+    }
+
+    static func resolved(from rawValue: String) -> Self {
+        SyntaxHighlightTheme(rawValue: rawValue) ?? .github
+    }
 }
 
 /// Main application entry point for QuickMarkdownViewer.
@@ -105,6 +145,16 @@ private struct QuickMarkdownViewerSettingsView: View {
         AppPreferenceKey.automaticUpdateCheckEnabled
     ) private var automaticUpdateCheckEnabled = AppPreferenceDefault.automaticUpdateCheckEnabled
 
+    @AppStorage(
+        AppPreferenceKey.syntaxHighlightingEnabled
+    ) private var syntaxHighlightingEnabled = AppPreferenceDefault.syntaxHighlightingEnabled
+
+    @AppStorage(
+        AppPreferenceKey.syntaxHighlightingTheme
+    ) private var syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
+
+    @Environment(\.colorScheme) private var colorScheme
+
     /// Selected Settings tab.
     @State private var selectedTab: SettingsTab = .general
 
@@ -139,6 +189,10 @@ private struct QuickMarkdownViewerSettingsView: View {
     @State private var isShowingAppearanceResetConfirmation = false
 
     private let appearanceRowLabelWidth: CGFloat = 160
+
+    private var selectedSyntaxHighlightTheme: SyntaxHighlightTheme {
+        SyntaxHighlightTheme.resolved(from: syntaxHighlightingThemeRawValue)
+    }
 
     private var windowBackgroundVisibilityPercentage: Int {
         Int(round(windowBackgroundVisibility * 100))
@@ -298,6 +352,31 @@ private struct QuickMarkdownViewerSettingsView: View {
                     }
                     .padding(.vertical, 4)
 
+                    appearancePaneRow("Syntax highlighting:") {
+                        Toggle("Highlight code blocks", isOn: $syntaxHighlightingEnabled)
+                    }
+                    .padding(.vertical, 4)
+
+                    appearancePaneRow("Syntax theme:", alignment: .center) {
+                        Picker("", selection: $syntaxHighlightingThemeRawValue) {
+                            ForEach(SyntaxHighlightTheme.allCases) { theme in
+                                Text(theme.displayName).tag(theme.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .disabled(!syntaxHighlightingEnabled)
+                    }
+                    .padding(.vertical, 4)
+
+                    appearancePaneRow("") {
+                        SyntaxHighlightPreviewPanel(
+                            theme: selectedSyntaxHighlightTheme,
+                            isHighlightingEnabled: syntaxHighlightingEnabled,
+                            isDarkMode: colorScheme == .dark
+                        )
+                    }
+                    .padding(.vertical, 2)
+
                     appearancePaneRow("Reset:") {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Press this button to restore the default settings in this pane only")
@@ -307,6 +386,7 @@ private struct QuickMarkdownViewerSettingsView: View {
                             }
                         }
                     }
+                    .padding(.vertical, 4)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -359,6 +439,12 @@ private struct QuickMarkdownViewerSettingsView: View {
 
             routing.setAppearancePreferenceForSettings(newPreference)
         }
+        .onChange(of: routing.appearancePreferenceRevision) { _ in
+            guard !isRefreshingGeneralTabState else {
+                return
+            }
+            selectedAppearancePreference = routing.appearancePreferenceForSettings()
+        }
         .alert("Reset General settings?", isPresented: $isShowingGeneralResetConfirmation) {
             Button("Cancel", role: .cancel) {}
             Button("Reset General Settings", role: .destructive) {
@@ -399,9 +485,13 @@ private struct QuickMarkdownViewerSettingsView: View {
 
     /// Restores only window-background controls in the Appearance tab.
     private func resetBackgroundSettingsToDefaults() {
+        routing.resetAppearancePreferenceToSystemDefault()
+        selectedAppearancePreference = routing.appearancePreferenceForSettings()
         windowBackgroundVisibility = AppPreferenceDefault.windowBackgroundVisibility
         windowBackgroundColorLightHex = AppPreferenceDefault.windowBackgroundColorLightHex
         windowBackgroundColorDarkHex = AppPreferenceDefault.windowBackgroundColorDarkHex
+        syntaxHighlightingEnabled = AppPreferenceDefault.syntaxHighlightingEnabled
+        syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
     }
 
     /// Refreshes General-tab controls from current system/app state.
@@ -524,5 +614,249 @@ private struct QuickMarkdownViewerSettingsView: View {
             max(0, min(255, green)),
             max(0, min(255, blue))
         )
+    }
+}
+
+/// Compact syntax-highlighting preview shown in the Appearance pane.
+private struct SyntaxHighlightPreviewPanel: View {
+    let theme: SyntaxHighlightTheme
+    let isHighlightingEnabled: Bool
+    let isDarkMode: Bool
+    @State private var measuredHeight: CGFloat = 66
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Theme preview")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            SyntaxHighlightPreviewWebView(
+                theme: theme,
+                isHighlightingEnabled: isHighlightingEnabled,
+                isDarkMode: isDarkMode
+            ) { newHeight in
+                let clampedHeight = min(max(newHeight, 56), 140)
+                guard abs(clampedHeight - measuredHeight) > 0.5 else {
+                    return
+                }
+                measuredHeight = clampedHeight
+            }
+            .frame(width: 420, height: measuredHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+            )
+        }
+    }
+}
+
+/// Native web preview so settings reflect the exact bundled highlight theme CSS.
+private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
+    let theme: SyntaxHighlightTheme
+    let isHighlightingEnabled: Bool
+    let isDarkMode: Bool
+    let onMeasuredHeight: (CGFloat) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onMeasuredHeight: onMeasuredHeight)
+    }
+
+    func makeNSView(context: Context) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = false
+
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        webView.setValue(false, forKey: "drawsBackground")
+        webView.underPageBackgroundColor = .clear
+        webView.allowsMagnification = false
+        webView.allowsBackForwardNavigationGestures = false
+        webView.setAccessibilityElement(false)
+        webView.navigationDelegate = context.coordinator
+        return webView
+    }
+
+    func updateNSView(_ webView: WKWebView, context: Context) {
+        let html = makeHTML(
+            theme: theme,
+            isHighlightingEnabled: isHighlightingEnabled,
+            isDarkMode: isDarkMode
+        )
+
+        guard context.coordinator.lastHTML != html else {
+            return
+        }
+
+        context.coordinator.lastHTML = html
+        webView.loadHTMLString(html, baseURL: nil)
+    }
+
+    private func makeHTML(
+        theme: SyntaxHighlightTheme,
+        isHighlightingEnabled: Bool,
+        isDarkMode: Bool
+    ) -> String {
+        let themeCSS = loadThemeCSS(theme: theme, isDarkMode: isDarkMode)
+        let highlightJavaScript = isHighlightingEnabled ? loadHighlightJavaScript() : ""
+        let textColor = isDarkMode ? "#E8EDF2" : "#1F2933"
+        let codeBackground = isDarkMode ? "#252B32" : "#F2F5F8"
+        let codeBorder = isDarkMode ? "#36404A" : "#DDE3EA"
+        let bodyBackground = isDarkMode ? "#1F2328" : "#FFFFFF"
+        let snippetSource = [
+            "import Foundation",
+            "let message = \"Hello, Markdown!\"",
+            "print(message)"
+        ].joined(separator: "\n")
+        let escapedSnippet = escapeHTML(snippetSource)
+        let codeClass = isHighlightingEnabled ? "hljs language-swift" : ""
+        let highlightBootstrapScript = isHighlightingEnabled ? """
+            <script>
+              \(highlightJavaScript)
+            </script>
+            <script>
+              (function () {
+                const code = document.getElementById("preview-code");
+                if (window.hljs && code) {
+                  window.hljs.highlightElement(code);
+                }
+              })();
+            </script>
+            """ : ""
+
+        return """
+        <!doctype html>
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              \(themeCSS)
+              html, body {
+                margin: 0;
+                padding: 0;
+                background: \(bodyBackground);
+                overflow: hidden;
+              }
+              body {
+                font: 13px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+                color: \(textColor);
+              }
+              .preview {
+                margin: 0;
+                padding: 8px 10px 5px 10px;
+                background: \(codeBackground);
+                border: 1px solid \(codeBorder);
+                border-radius: 10px;
+                overflow: hidden;
+              }
+              pre {
+                margin: 0;
+                white-space: pre;
+                overflow: hidden;
+              }
+              code {
+                display: block;
+                font: 13px/1.3 "SF Mono", "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+              }
+              pre code.hljs,
+              code.hljs {
+                background: transparent !important;
+                padding: 0 !important;
+              }
+              pre code.hljs *,
+              code.hljs * {
+                font-style: normal !important;
+                font-weight: inherit !important;
+              }
+            </style>
+          </head>
+          <body>
+            <pre class="preview"><code id="preview-code" class="\(codeClass)">\(escapedSnippet)</code></pre>
+            \(highlightBootstrapScript)
+          </body>
+        </html>
+        """
+    }
+
+    private func loadThemeCSS(theme: SyntaxHighlightTheme, isDarkMode: Bool) -> String {
+        let resourceName: String
+
+        switch (theme, isDarkMode) {
+        case (.github, true):
+            resourceName = "highlight-github-dark.min"
+        case (.github, false):
+            resourceName = "highlight-github.min"
+        case (.vscode, true):
+            resourceName = "highlight-vs2015.min"
+        case (.vscode, false):
+            resourceName = "highlight-vs.min"
+        case (.atomOne, true):
+            resourceName = "highlight-atom-one-dark.min"
+        case (.atomOne, false):
+            resourceName = "highlight-atom-one-light.min"
+        case (.stackOverflow, true):
+            resourceName = "highlight-stackoverflow-dark.min"
+        case (.stackOverflow, false):
+            resourceName = "highlight-stackoverflow-light.min"
+        }
+
+        let url = Bundle.main.url(
+            forResource: resourceName,
+            withExtension: "css",
+            subdirectory: "Web"
+        ) ?? Bundle.main.url(forResource: resourceName, withExtension: "css")
+
+        guard let url else {
+            return ""
+        }
+
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
+    private func loadHighlightJavaScript() -> String {
+        let url = Bundle.main.url(
+            forResource: "highlight.min",
+            withExtension: "js",
+            subdirectory: "Web"
+        ) ?? Bundle.main.url(forResource: "highlight.min", withExtension: "js")
+
+        guard let url else {
+            return ""
+        }
+
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
+    private func escapeHTML(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var lastHTML = ""
+        private let onMeasuredHeight: (CGFloat) -> Void
+
+        init(onMeasuredHeight: @escaping (CGFloat) -> Void) {
+            self.onMeasuredHeight = onMeasuredHeight
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            let script = """
+            (function () {
+              const preview = document.querySelector('pre.preview');
+              if (!preview) { return 66; }
+              return Math.ceil(preview.getBoundingClientRect().height);
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { result, _ in
+                guard let rawValue = result as? NSNumber else {
+                    return
+                }
+                let height = CGFloat(truncating: rawValue)
+                self.onMeasuredHeight(height + 1)
+            }
+        }
     }
 }

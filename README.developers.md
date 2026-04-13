@@ -164,6 +164,7 @@ This section is maintained as Quick Markdown Viewer evolves, and should be revie
 - Runtime rendering stack:
   - `WKWebView` (system WebKit on macOS).
   - Bundled local `markdown-it` (`QuickMarkdownViewer/Web/markdown-it.min.js`, current technical source path).
+  - Bundled local `highlight.js` (`QuickMarkdownViewer/Web/highlight.min.js`) for optional fenced-code syntax highlighting.
   - Bundled local renderer/template assets (`index.html`, `renderer.js`, `styles.css`).
 - Build dependency:
   - Xcode (for local build/run from source).
@@ -220,11 +221,20 @@ and [README.developers.md](README.developers.md) are examples of behaviour that
 may work on a hosting platform without being a Quick Markdown Viewer
 compatibility target.
 
+Fenced-code syntax highlighting is optional and local-only: when enabled in
+Settings, the app applies bundled `highlight.js` after `markdown-it` renders
+document HTML. This setting is off by default. The default highlight theme is
+GitHub (light/dark), with VS Code, Atom One, and Stack Overflow theme families
+also bundled for selection in Settings. For print and PDF export, syntax
+highlighting always resolves to the selected theme’s light variant so output
+remains print-friendly regardless of the active app appearance mode.
+
 ## Local Rendering and Security Model
 
 Quick Markdown Viewer uses a local rendering pipeline. Markdown source is
 converted into an app-controlled HTML document using bundled `markdown-it`,
-bundled CSS, and bundled renderer JavaScript, then loaded into `WKWebView`.
+bundled `highlight.js` (optional), bundled CSS, and bundled renderer
+JavaScript, then loaded into `WKWebView`.
 The app does not use a remote Markdown rendering API or upload document
 contents for normal viewing.
 

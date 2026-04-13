@@ -1156,10 +1156,50 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
                 return null;
             }
 
+            const stripDarkScreenMediaBlocks = (cssText) => {
+                const marker = "@media screen and (prefers-color-scheme: dark)";
+                let output = "";
+                let searchStart = 0;
+
+                while (searchStart < cssText.length) {
+                    const markerIndex = cssText.indexOf(marker, searchStart);
+                    if (markerIndex < 0) {
+                        output += cssText.slice(searchStart);
+                        break;
+                    }
+
+                    output += cssText.slice(searchStart, markerIndex);
+
+                    const blockStart = cssText.indexOf("{", markerIndex + marker.length);
+                    if (blockStart < 0) {
+                        searchStart = markerIndex + marker.length;
+                        continue;
+                    }
+
+                    let depth = 1;
+                    let cursor = blockStart + 1;
+                    while (cursor < cssText.length && depth > 0) {
+                        const char = cssText[cursor];
+                        if (char === "{") {
+                            depth += 1;
+                        } else if (char === "}") {
+                            depth -= 1;
+                        }
+                        cursor += 1;
+                    }
+
+                    searchStart = cursor;
+                }
+
+                return output;
+            };
+
             const combinedStyles = Array
                 .from(document.querySelectorAll("style"))
+                .filter(styleElement => !styleElement.disabled)
                 .map(styleElement => styleElement.textContent || "")
                 .join("\\n");
+            const printFriendlyStyles = stripDarkScreenMediaBlocks(combinedStyles);
 
             const baseElement = document.querySelector("base");
             const baseURLString = baseElement
@@ -1168,7 +1208,7 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
 
             return {
                 contentHTML: content.outerHTML,
-                stylesCSS: combinedStyles,
+                stylesCSS: printFriendlyStyles,
                 baseURLString
             };
         })();
@@ -1570,6 +1610,12 @@ struct MarkdownWebView: NSViewRepresentable {
     /// User-selected dark-mode background colour (`#RRGGBB`).
     let windowBackgroundColorDarkHex: String
 
+    /// True when fenced-code syntax highlighting should be enabled.
+    let syntaxHighlightingEnabled: Bool
+
+    /// Selected syntax-highlight theme family raw value.
+    let syntaxHighlightingThemeRawValue: String
+
     /// Creates coordinator used for navigation delegate callbacks.
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -1610,6 +1656,8 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.windowBackgroundVisibility = windowBackgroundVisibility
         context.coordinator.windowBackgroundColorLightHex = windowBackgroundColorLightHex
         context.coordinator.windowBackgroundColorDarkHex = windowBackgroundColorDarkHex
+        context.coordinator.syntaxHighlightingEnabled = syntaxHighlightingEnabled
+        context.coordinator.syntaxHighlightingThemeRawValue = syntaxHighlightingThemeRawValue
         context.coordinator.installMagnifyEventMonitorIfNeeded(on: webView)
         context.coordinator.installWebViewSizeObserverIfNeeded(on: webView)
         searchBridge.bind(webView: webView)
@@ -1631,6 +1679,8 @@ struct MarkdownWebView: NSViewRepresentable {
         // Apply window-background settings without forcing a reload so slider
         // and colour-picker updates feel immediate.
         context.coordinator.applyWindowBackgroundPreferencesIfNeeded(on: webView)
+        context.coordinator.applySyntaxHighlightingPreferenceIfNeeded(on: webView)
+        context.coordinator.applySyntaxHighlightingThemePreferenceIfNeeded(on: webView)
     }
 
     /// Navigation delegate object used by the web view.
@@ -1656,6 +1706,12 @@ struct MarkdownWebView: NSViewRepresentable {
         /// Raw persisted dark-mode background colour (`#RRGGBB`).
         var windowBackgroundColorDarkHex: String = AppPreferenceDefault.windowBackgroundColorDarkHex
 
+        /// True when fenced-code syntax highlighting should be enabled.
+        var syntaxHighlightingEnabled: Bool = AppPreferenceDefault.syntaxHighlightingEnabled
+
+        /// Selected syntax-highlight theme family raw value.
+        var syntaxHighlightingThemeRawValue: String = AppPreferenceDefault.syntaxHighlightingTheme
+
         /// Fingerprint of last loaded HTML to avoid unnecessary reloads.
         var lastLoadedFingerprint = ""
 
@@ -1679,6 +1735,12 @@ struct MarkdownWebView: NSViewRepresentable {
 
         /// Last applied dark-mode custom-colour hex value.
         private var lastAppliedWindowBackgroundColorDarkHex: String?
+
+        /// Last applied syntax-highlighting enabled state.
+        private var lastAppliedSyntaxHighlightingEnabled: Bool?
+
+        /// Last applied syntax-highlight theme key.
+        private var lastAppliedSyntaxHighlightingThemeRawValue: String?
 
         /// Weak reference to the currently monitored web view instance.
         private weak var monitoredWebView: WKWebView?
@@ -1927,6 +1989,8 @@ struct MarkdownWebView: NSViewRepresentable {
 
             // Reapply preferences after each load because the DOM was rebuilt.
             applyWindowBackgroundPreferencesIfNeeded(on: webView, force: true)
+            applySyntaxHighlightingPreferenceIfNeeded(on: webView, force: true)
+            applySyntaxHighlightingThemePreferenceIfNeeded(on: webView, force: true)
 
             guard shouldApplyInitialZoomToFitOnNextDidFinish else {
                 return
@@ -2042,6 +2106,65 @@ struct MarkdownWebView: NSViewRepresentable {
             webView.evaluateJavaScript(script) { _, error in
                 if let error {
                     Logger.error("Failed to apply window background settings: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// Applies syntax-highlighting preference without reloading the page.
+        func applySyntaxHighlightingPreferenceIfNeeded(on webView: WKWebView, force: Bool = false) {
+            let enabled = syntaxHighlightingEnabled
+            let shouldApply = force || lastAppliedSyntaxHighlightingEnabled != enabled
+            guard shouldApply else {
+                return
+            }
+
+            lastAppliedSyntaxHighlightingEnabled = enabled
+
+            let enabledLiteral = enabled ? "true" : "false"
+            let script = """
+            (() => {
+                const renderer = window.QuickMarkdownViewerRenderer;
+                if (!renderer || typeof renderer.setSyntaxHighlightingEnabled !== 'function') {
+                    return;
+                }
+
+                renderer.setSyntaxHighlightingEnabled(\(enabledLiteral));
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    Logger.error("Failed to apply syntax highlighting setting: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// Applies syntax-highlight theme preference without reloading the page.
+        func applySyntaxHighlightingThemePreferenceIfNeeded(on webView: WKWebView, force: Bool = false) {
+            let resolvedTheme = SyntaxHighlightTheme.resolved(
+                from: syntaxHighlightingThemeRawValue
+            ).rawValue
+            let shouldApply = force || lastAppliedSyntaxHighlightingThemeRawValue != resolvedTheme
+            guard shouldApply else {
+                return
+            }
+
+            lastAppliedSyntaxHighlightingThemeRawValue = resolvedTheme
+            let themeLiteral = SecurityHelpers.jsonStringLiteral(resolvedTheme)
+            let script = """
+            (() => {
+                const renderer = window.QuickMarkdownViewerRenderer;
+                if (!renderer || typeof renderer.setSyntaxTheme !== 'function') {
+                    return;
+                }
+
+                renderer.setSyntaxTheme(\(themeLiteral));
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    Logger.error("Failed to apply syntax theme setting: \(error.localizedDescription)")
                 }
             }
         }

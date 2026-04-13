@@ -589,6 +589,9 @@ final class AppRouting: ObservableObject {
         toolbarVisibilityRevision
     }
 
+    /// Tiny published token used to refresh appearance controls in Settings.
+    @Published private(set) var appearancePreferenceRevision: UInt = 0
+
     /// Most recent document window used for menu-state fallback routing.
     private weak var lastRoutedDocumentWindow: NSWindow?
 
@@ -715,6 +718,7 @@ final class AppRouting: ObservableObject {
         case .system:
             defaults.removeObject(forKey: appearanceModeDefaultsKey)
             NSApp.appearance = nil
+            notifyAppearancePreferenceChanged()
 
         case .light:
             setPersistedAppearanceMode(.light)
@@ -2115,6 +2119,8 @@ final class AppRouting: ObservableObject {
         case .dark:
             NSApp.appearance = NSAppearance(named: .darkAqua)
         }
+
+        notifyAppearancePreferenceChanged()
     }
 
     /// Detects current effective app appearance as a light/dark enum.
@@ -2133,6 +2139,11 @@ final class AppRouting: ObservableObject {
     /// Bumps toolbar command refresh token.
     private func notifyToolbarVisibilityChanged() {
         toolbarVisibilityRevision &+= 1
+    }
+
+    /// Bumps appearance settings refresh token.
+    private func notifyAppearancePreferenceChanged() {
+        appearancePreferenceRevision &+= 1
     }
 }
 

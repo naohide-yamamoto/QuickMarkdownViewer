@@ -41,6 +41,8 @@ struct MarkdownRenderService {
         let indexTemplate = try loadResource(named: "index", ext: "html")
         let styles = try loadResource(named: "styles", ext: "css")
         let markdownIt = try loadResource(named: "markdown-it.min", ext: "js")
+        let highlight = try loadResource(named: "highlight.min", ext: "js")
+        let highlightThemeCSSByTheme = try loadHighlightThemeCSSByTheme()
         let renderer = try loadResource(named: "renderer", ext: "js")
 
         // Inline local image links as `data:` URIs.
@@ -58,13 +60,49 @@ struct MarkdownRenderService {
         // Encode user content safely before embedding into inline script.
         let markdownSource = SecurityHelpers.jsonStringLiteral(markdownWithInlinedLocalImages)
         let documentBaseURL = SecurityHelpers.htmlAttributeLiteral(baseDirectoryURL.absoluteString)
+        let syntaxHighlightingEnabledJSON = UserDefaults.standard.bool(
+            forKey: AppPreferenceKey.syntaxHighlightingEnabled
+        ) ? "true" : "false"
+        let syntaxHighlightingThemeRawValue = SyntaxHighlightTheme.resolved(
+            from: UserDefaults.standard.string(
+                forKey: AppPreferenceKey.syntaxHighlightingTheme
+            ) ?? AppPreferenceDefault.syntaxHighlightingTheme
+        ).rawValue
+        let syntaxHighlightingThemeJSON = SecurityHelpers.jsonStringLiteral(
+            syntaxHighlightingThemeRawValue
+        )
 
         return indexTemplate
             .replacingOccurrences(of: "{{STYLES_CSS}}", with: styles)
             .replacingOccurrences(of: "{{MARKDOWN_IT_JS}}", with: markdownIt)
+            .replacingOccurrences(of: "{{HIGHLIGHT_JS}}", with: highlight)
+            .replacingOccurrences(
+                of: "{{HIGHLIGHT_THEME_GITHUB_CSS}}",
+                with: highlightThemeCSSByTheme[.github] ?? ""
+            )
+            .replacingOccurrences(
+                of: "{{HIGHLIGHT_THEME_VSCODE_CSS}}",
+                with: highlightThemeCSSByTheme[.vscode] ?? ""
+            )
+            .replacingOccurrences(
+                of: "{{HIGHLIGHT_THEME_ATOM_ONE_CSS}}",
+                with: highlightThemeCSSByTheme[.atomOne] ?? ""
+            )
+            .replacingOccurrences(
+                of: "{{HIGHLIGHT_THEME_STACKOVERFLOW_CSS}}",
+                with: highlightThemeCSSByTheme[.stackOverflow] ?? ""
+            )
             .replacingOccurrences(of: "{{RENDERER_JS}}", with: renderer)
             .replacingOccurrences(of: "{{DOCUMENT_BASE_URL}}", with: documentBaseURL)
             .replacingOccurrences(of: "{{MARKDOWN_SOURCE_JSON}}", with: markdownSource)
+            .replacingOccurrences(
+                of: "{{SYNTAX_HIGHLIGHTING_ENABLED_JSON}}",
+                with: syntaxHighlightingEnabledJSON
+            )
+            .replacingOccurrences(
+                of: "{{SYNTAX_HIGHLIGHTING_THEME_JSON}}",
+                with: syntaxHighlightingThemeJSON
+            )
     }
 
     /// Rewrites Markdown image destinations pointing to local files into
@@ -234,5 +272,47 @@ struct MarkdownRenderService {
         }
 
         return text
+    }
+
+    /// Wraps highlight.js themes so screen uses light/dark variants and print uses light.
+    private func makeHighlightThemeCSS(lightThemeCSS: String, darkThemeCSS: String) -> String {
+        """
+        \(lightThemeCSS)
+
+        @media screen and (prefers-color-scheme: dark) {
+          \(darkThemeCSS)
+        }
+        """
+    }
+
+    /// Loads all bundled highlight.js theme families.
+    private func loadHighlightThemeCSSByTheme() throws -> [SyntaxHighlightTheme: String] {
+        let githubLight = try loadResource(named: "highlight-github.min", ext: "css")
+        let githubDark = try loadResource(named: "highlight-github-dark.min", ext: "css")
+        let vscodeLight = try loadResource(named: "highlight-vs.min", ext: "css")
+        let vscodeDark = try loadResource(named: "highlight-vs2015.min", ext: "css")
+        let atomOneLight = try loadResource(named: "highlight-atom-one-light.min", ext: "css")
+        let atomOneDark = try loadResource(named: "highlight-atom-one-dark.min", ext: "css")
+        let stackOverflowLight = try loadResource(named: "highlight-stackoverflow-light.min", ext: "css")
+        let stackOverflowDark = try loadResource(named: "highlight-stackoverflow-dark.min", ext: "css")
+
+        return [
+            .github: makeHighlightThemeCSS(
+                lightThemeCSS: githubLight,
+                darkThemeCSS: githubDark
+            ),
+            .vscode: makeHighlightThemeCSS(
+                lightThemeCSS: vscodeLight,
+                darkThemeCSS: vscodeDark
+            ),
+            .atomOne: makeHighlightThemeCSS(
+                lightThemeCSS: atomOneLight,
+                darkThemeCSS: atomOneDark
+            ),
+            .stackOverflow: makeHighlightThemeCSS(
+                lightThemeCSS: stackOverflowLight,
+                darkThemeCSS: stackOverflowDark
+            )
+        ]
     }
 }

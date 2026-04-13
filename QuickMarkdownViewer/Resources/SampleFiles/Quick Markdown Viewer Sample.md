@@ -40,10 +40,12 @@ This paragraph demonstrates **bold text**, *italic text*, `inline code`, and ~~s
 
 ## Code Example
 
+Tip: Turn on **Syntax highlighting** in **Settings** to see this code block in colour.
+
 ```swift
 import Foundation
 
-let message = "Markdown should open like a document."
+let message = "Hello, Markdown!"
 print(message)
 ```
 

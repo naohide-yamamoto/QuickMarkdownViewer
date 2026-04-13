@@ -15,9 +15,17 @@
 		3A0318AB9A8472A32AB284E6 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8069D8D6286D8E912E0DF908 /* Logger.swift */; };
 		527F3250262D42D1859682EA /* LinkRoutingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9B8084ECA26DFB3C8EC61A0A /* LinkRoutingService.swift */; };
 		5A0EDD1ECA852231DE2A2232 /* AppCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF0829A8E7B15ABEC09B47D7 /* AppCommands.swift */; };
+		5D77A11B97A34B5CA1E2D301 /* highlight.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 4B1E6FA235D942AA9C8B1F11 /* highlight.min.js */; };
 		603EE8FA0E1E5B3544F3B5EC /* renderer.js in Resources */ = {isa = PBXBuildFile; fileRef = 6E28507E991BCAD1A863E625 /* renderer.js */; };
 		73C4F775EE8929E7E0D375ED /* RecentDocumentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 79FEE83BD21E7025025C309F /* RecentDocumentService.swift */; };
-		80E0E2814E325B4459A8EF95 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 120F84613209A8F1FD1FB6B2 /* EmptyStateView.swift */; };
+			80E0E2814E325B4459A8EF95 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 120F84613209A8F1FD1FB6B2 /* EmptyStateView.swift */; };
+			A1F8B6C2D4E5F60718293A4D /* highlight-vs.min.css in Resources */ = {isa = PBXBuildFile; fileRef = A1F8B6C2D4E5F60718293A4E /* highlight-vs.min.css */; };
+			A1F8B6C2D4E5F60718293A4F /* highlight-vs2015.min.css in Resources */ = {isa = PBXBuildFile; fileRef = A1F8B6C2D4E5F60718293A50 /* highlight-vs2015.min.css */; };
+			A1F8B6C2D4E5F60718293A51 /* highlight-atom-one-light.min.css in Resources */ = {isa = PBXBuildFile; fileRef = A1F8B6C2D4E5F60718293A52 /* highlight-atom-one-light.min.css */; };
+			A1F8B6C2D4E5F60718293A53 /* highlight-atom-one-dark.min.css in Resources */ = {isa = PBXBuildFile; fileRef = A1F8B6C2D4E5F60718293A54 /* highlight-atom-one-dark.min.css */; };
+			A1F8B6C2D4E5F60718293A55 /* highlight-stackoverflow-light.min.css in Resources */ = {isa = PBXBuildFile; fileRef = A1F8B6C2D4E5F60718293A56 /* highlight-stackoverflow-light.min.css */; };
+			A1F8B6C2D4E5F60718293A57 /* highlight-stackoverflow-dark.min.css in Resources */ = {isa = PBXBuildFile; fileRef = A1F8B6C2D4E5F60718293A58 /* highlight-stackoverflow-dark.min.css */; };
+			A8C4F2193DB64C7E9F1A2455 /* highlight-github.min.css in Resources */ = {isa = PBXBuildFile; fileRef = 7D8BCAE1F2E34D63A6B19F42 /* highlight-github.min.css */; };
 		9081E322DCAE04408FEB3B34 /* markdown-it.min.js in Resources */ = {isa = PBXBuildFile; fileRef = 9607394B4E97C4E152F09188 /* markdown-it.min.js */; };
 		9AD50BD2359E5927F763233D /* DocumentState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 54DDECB006A9C322D26CE73C /* DocumentState.swift */; };
 		A1B2C3D4E5F60718293A4B5C /* Help/QuickMarkdownViewerHelp.help in Resources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5D /* Help/QuickMarkdownViewerHelp.help */; };
@@ -33,6 +41,7 @@
 		E3E882588C16BB48BDCDCCC8 /* PathResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F08776950DBDA593538E84E /* PathResolver.swift */; };
 		E8C988008D5F4C6FADEBAEB0 /* Quick Markdown Viewer Sample.md in Resources */ = {isa = PBXBuildFile; fileRef = 5879E55B0D7777EFE1FE4EDC /* Quick Markdown Viewer Sample.md */; };
 		EFD08600B21540E97E3EECD9 /* AppRouting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 606CAFED53527E465ED7F12B /* AppRouting.swift */; };
+		C3EE0197B5F147AD8D4C6628 /* highlight-github-dark.min.css in Resources */ = {isa = PBXBuildFile; fileRef = 9A3D0E6C14F24C278D5B30A7 /* highlight-github-dark.min.css */; };
 		FF762D87193A1F9157196FA9 /* MarkdownWebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8C79CE7C2D1ED42ACE066B7E /* MarkdownWebView.swift */; };
 /* End PBXBuildFile section */
 
@@ -42,6 +51,7 @@
 		120F84613209A8F1FD1FB6B2 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		1DF753E31D2BF175657B269B /* Cocoa.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Cocoa.framework; path = Platforms/MacOSX.platform/Developer/SDKs/MacOSX15.0.sdk/System/Library/Frameworks/Cocoa.framework; sourceTree = DEVELOPER_DIR; };
 		2BCEC735A3F967661A2E0244 /* QuickMarkdownViewerApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = QuickMarkdownViewerApp.swift; sourceTree = "<group>"; };
+		4B1E6FA235D942AA9C8B1F11 /* highlight.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; path = "highlight.min.js"; sourceTree = "<group>"; };
 		4ECE945D8E9788C02CE85191 /* FileOpenService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FileOpenService.swift; sourceTree = "<group>"; };
 		54DDECB006A9C322D26CE73C /* DocumentState.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentState.swift; sourceTree = "<group>"; };
 		58746BFC47DA5AE169F4173C /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -51,15 +61,23 @@
 		606CAFED53527E465ED7F12B /* AppRouting.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppRouting.swift; sourceTree = "<group>"; };
 		6E28507E991BCAD1A863E625 /* renderer.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; path = renderer.js; sourceTree = "<group>"; };
 		79FEE83BD21E7025025C309F /* RecentDocumentService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentDocumentService.swift; sourceTree = "<group>"; };
+		7D8BCAE1F2E34D63A6B19F42 /* highlight-github.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-github.min.css"; sourceTree = "<group>"; };
 		8069D8D6286D8E912E0DF908 /* Logger.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		89CB973C9B823B1805C8C307 /* DocumentWindowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DocumentWindowView.swift; sourceTree = "<group>"; };
 		8AAC2FE7A2FF795FB4592E40 /* SecurityHelpers.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SecurityHelpers.swift; sourceTree = "<group>"; };
 		8BC2714DA326CAF9DCC3D412 /* MarkdownRenderService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownRenderService.swift; sourceTree = "<group>"; };
 		8C79CE7C2D1ED42ACE066B7E /* MarkdownWebView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = MarkdownWebView.swift; sourceTree = "<group>"; };
 		9607394B4E97C4E152F09188 /* markdown-it.min.js */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.javascript; path = "markdown-it.min.js"; sourceTree = "<group>"; };
+		9A3D0E6C14F24C278D5B30A7 /* highlight-github-dark.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-github-dark.min.css"; sourceTree = "<group>"; };
 		9B8084ECA26DFB3C8EC61A0A /* LinkRoutingService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LinkRoutingService.swift; sourceTree = "<group>"; };
-		9F08776950DBDA593538E84E /* PathResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PathResolver.swift; sourceTree = "<group>"; };
-		A1B2C3D4E5F60718293A4B5D /* Help/QuickMarkdownViewerHelp.help */ = {isa = PBXFileReference; lastKnownFileType = wrapper.help; path = Help/QuickMarkdownViewerHelp.help; sourceTree = "<group>"; };
+			9F08776950DBDA593538E84E /* PathResolver.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PathResolver.swift; sourceTree = "<group>"; };
+			A1F8B6C2D4E5F60718293A4E /* highlight-vs.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-vs.min.css"; sourceTree = "<group>"; };
+			A1F8B6C2D4E5F60718293A50 /* highlight-vs2015.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-vs2015.min.css"; sourceTree = "<group>"; };
+			A1F8B6C2D4E5F60718293A52 /* highlight-atom-one-light.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-atom-one-light.min.css"; sourceTree = "<group>"; };
+			A1F8B6C2D4E5F60718293A54 /* highlight-atom-one-dark.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-atom-one-dark.min.css"; sourceTree = "<group>"; };
+			A1F8B6C2D4E5F60718293A56 /* highlight-stackoverflow-light.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-stackoverflow-light.min.css"; sourceTree = "<group>"; };
+			A1F8B6C2D4E5F60718293A58 /* highlight-stackoverflow-dark.min.css */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.css; path = "highlight-stackoverflow-dark.min.css"; sourceTree = "<group>"; };
+			A1B2C3D4E5F60718293A4B5D /* Help/QuickMarkdownViewerHelp.help */ = {isa = PBXFileReference; lastKnownFileType = wrapper.help; path = Help/QuickMarkdownViewerHelp.help; sourceTree = "<group>"; };
 		A6A1D7A0B3C14E6F8D9A0B1C /* Quick Markdown Viewer Linked Sample.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; path = "Quick Markdown Viewer Linked Sample.md"; sourceTree = "<group>"; };
 		CD868FB5868995DD53D4113E /* Contents.json */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.json; path = Contents.json; sourceTree = "<group>"; };
 		ED81AA1D38B0CF99E61BC540 /* README.md */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = net.daringfireball.markdown; path = README.md; sourceTree = "<group>"; };
@@ -165,8 +183,17 @@
 				F1123461ADEF13A626C0E32A /* index.html */,
 				6E28507E991BCAD1A863E625 /* renderer.js */,
 				9607394B4E97C4E152F09188 /* markdown-it.min.js */,
-				F7F234D0B401459E46D9AD48 /* styles.css */,
-			);
+					4B1E6FA235D942AA9C8B1F11 /* highlight.min.js */,
+					7D8BCAE1F2E34D63A6B19F42 /* highlight-github.min.css */,
+					9A3D0E6C14F24C278D5B30A7 /* highlight-github-dark.min.css */,
+					A1F8B6C2D4E5F60718293A4E /* highlight-vs.min.css */,
+					A1F8B6C2D4E5F60718293A50 /* highlight-vs2015.min.css */,
+					A1F8B6C2D4E5F60718293A52 /* highlight-atom-one-light.min.css */,
+					A1F8B6C2D4E5F60718293A54 /* highlight-atom-one-dark.min.css */,
+					A1F8B6C2D4E5F60718293A56 /* highlight-stackoverflow-light.min.css */,
+					A1F8B6C2D4E5F60718293A58 /* highlight-stackoverflow-dark.min.css */,
+					F7F234D0B401459E46D9AD48 /* styles.css */,
+				);
 			path = Web;
 			sourceTree = "<group>";
 		};
@@ -291,7 +318,16 @@
 				30514FE0ED3356BEEA46E0B6 /* index.html in Resources */,
 				603EE8FA0E1E5B3544F3B5EC /* renderer.js in Resources */,
 				9081E322DCAE04408FEB3B34 /* markdown-it.min.js in Resources */,
-				A940DE0C6E8CCC5FA190D511 /* styles.css in Resources */,
+					5D77A11B97A34B5CA1E2D301 /* highlight.min.js in Resources */,
+					A8C4F2193DB64C7E9F1A2455 /* highlight-github.min.css in Resources */,
+					C3EE0197B5F147AD8D4C6628 /* highlight-github-dark.min.css in Resources */,
+					A1F8B6C2D4E5F60718293A4D /* highlight-vs.min.css in Resources */,
+					A1F8B6C2D4E5F60718293A4F /* highlight-vs2015.min.css in Resources */,
+					A1F8B6C2D4E5F60718293A51 /* highlight-atom-one-light.min.css in Resources */,
+					A1F8B6C2D4E5F60718293A53 /* highlight-atom-one-dark.min.css in Resources */,
+					A1F8B6C2D4E5F60718293A55 /* highlight-stackoverflow-light.min.css in Resources */,
+					A1F8B6C2D4E5F60718293A57 /* highlight-stackoverflow-dark.min.css in Resources */,
+					A940DE0C6E8CCC5FA190D511 /* styles.css in Resources */,
 				E8C988008D5F4C6FADEBAEB0 /* Quick Markdown Viewer Sample.md in Resources */,
 				A6A1D7A1B3C14E6F8D9A0B1C /* Quick Markdown Viewer Linked Sample.md in Resources */,
 				C6439003B57F6D7402E65251 /* sample-image.png in Resources */,
