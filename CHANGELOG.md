@@ -6,6 +6,9 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ## [Unreleased]
 
+### Fixed
+- Removed first-document open background flashing on app launch by restoring the stable v1.0.5 load transition path and resolving light/dark background colours in CSS rather than SwiftUI render-time state.
+
 ## [1.0.5] - 2026-04-09
 
 ### Added

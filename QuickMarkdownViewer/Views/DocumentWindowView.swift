@@ -62,6 +62,29 @@ struct DocumentWindowView: View {
     /// True when the native search field currently owns keyboard focus.
     @State private var isFindFieldFocused = false
 
+    /// User preference controlling how much outer background framing is visible.
+    @AppStorage(
+        AppPreferenceKey.windowBackgroundVisibility
+    ) private var windowBackgroundVisibility = AppPreferenceDefault.windowBackgroundVisibility
+
+    /// Current effective colour scheme used for live appearance updates.
+    @Environment(\.colorScheme) private var colorScheme
+
+    /// Light-mode window background colour (`#RRGGBB`).
+    @AppStorage(
+        AppPreferenceKey.windowBackgroundColorLightHex
+    ) private var windowBackgroundColorLightHex = AppPreferenceDefault.windowBackgroundColorLightHex
+
+    /// Dark-mode window background colour (`#RRGGBB`).
+    @AppStorage(
+        AppPreferenceKey.windowBackgroundColorDarkHex
+    ) private var windowBackgroundColorDarkHex = AppPreferenceDefault.windowBackgroundColorDarkHex
+
+    /// Sanitised visibility value applied to web rendering.
+    private var clampedWindowBackgroundVisibility: Double {
+        max(0.0, min(1.0, windowBackgroundVisibility))
+    }
+
     /// True when the current phase has a loaded Markdown document.
     private var canUseDocumentControls: Bool {
         if case .loaded = documentState.phase, documentState.document != nil {
@@ -73,7 +96,7 @@ struct DocumentWindowView: View {
 
     /// True when app appearance is currently dark.
     private var isDarkAppearanceActive: Bool {
-        NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        colorScheme == .dark
     }
 
     var body: some View {
@@ -173,7 +196,10 @@ struct DocumentWindowView: View {
                     baseURL: document.baseDirectoryURL,
                     documentURL: document.fileURL,
                     onOpenMarkdown: onOpenFile,
-                    searchBridge: webViewSearchBridge
+                    searchBridge: webViewSearchBridge,
+                    windowBackgroundVisibility: clampedWindowBackgroundVisibility,
+                    windowBackgroundColorLightHex: windowBackgroundColorLightHex,
+                    windowBackgroundColorDarkHex: windowBackgroundColorDarkHex
                 )
             } else {
                 Text("Couldn’t open this Markdown file.")

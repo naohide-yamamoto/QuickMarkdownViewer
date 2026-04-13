@@ -25,6 +25,13 @@
   --muted-dark: #b5bdc8;
   --rule-dark: #36404a;
   --code-bg-dark: #252b32;
+
+  /* User-configurable window-background framing. */
+  --qmv-background-scale: 0.5;
+  --qmv-background-custom-color-light: #f6f5f2;
+  --qmv-background-custom-color-dark: #16181b;
+  --qmv-background-custom-color: var(--qmv-background-custom-color-light);
+  --qmv-content-max-width: 840px;
 }
 
 * {
@@ -38,7 +45,7 @@ body {
 }
 
 body {
-  background: var(--page-bg-light);
+  background: var(--qmv-background-custom-color);
   color: var(--text-light);
   font: 17px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   text-rendering: optimizeLegibility;
@@ -46,12 +53,21 @@ body {
 
 /* Main reading column */
 .content {
-  width: min(100%, 840px);
-  margin: 28px auto 44px;
+  width: min(
+    100%,
+    calc(
+      (1 - var(--qmv-background-scale)) * 100% +
+      var(--qmv-background-scale) * var(--qmv-content-max-width)
+    )
+  );
+  margin:
+    calc(var(--qmv-background-scale) * 28px)
+    auto
+    calc(var(--qmv-background-scale) * 44px);
   padding: 32px clamp(20px, 3.5vw, 44px);
   background: var(--card-bg-light);
-  border: 1px solid var(--rule-light);
-  border-radius: 16px;
+  border: calc(var(--qmv-background-scale) * 1px) solid var(--rule-light);
+  border-radius: calc(var(--qmv-background-scale) * 16px);
   overflow-x: auto;
 }
 
@@ -193,16 +209,19 @@ hr {
 /* Compact spacing on narrower windows */
 @media (max-width: 740px) {
   .content {
-    margin: 12px;
+    margin: calc(var(--qmv-background-scale) * 12px);
     padding: 22px 18px;
-    border-radius: 12px;
+    border-radius: calc(var(--qmv-background-scale) * 12px);
   }
 }
 
 /* Dark appearance overrides */
 @media (prefers-color-scheme: dark) {
+  :root {
+    --qmv-background-custom-color: var(--qmv-background-custom-color-dark);
+  }
+
   body {
-    background: var(--page-bg-dark);
     color: var(--text-dark);
   }
 

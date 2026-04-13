@@ -1561,6 +1561,15 @@ struct MarkdownWebView: NSViewRepresentable {
     /// Bridge object used by document-level Find controls.
     let searchBridge: MarkdownWebViewSearchBridge
 
+    /// User setting controlling how much outer background framing is visible.
+    let windowBackgroundVisibility: Double
+
+    /// User-selected light-mode background colour (`#RRGGBB`).
+    let windowBackgroundColorLightHex: String
+
+    /// User-selected dark-mode background colour (`#RRGGBB`).
+    let windowBackgroundColorDarkHex: String
+
     /// Creates coordinator used for navigation delegate callbacks.
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -1598,6 +1607,9 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.baseDirectoryURL = baseURL
         context.coordinator.onOpenMarkdown = onOpenMarkdown
         context.coordinator.searchBridge = searchBridge
+        context.coordinator.windowBackgroundVisibility = windowBackgroundVisibility
+        context.coordinator.windowBackgroundColorLightHex = windowBackgroundColorLightHex
+        context.coordinator.windowBackgroundColorDarkHex = windowBackgroundColorDarkHex
         context.coordinator.installMagnifyEventMonitorIfNeeded(on: webView)
         context.coordinator.installWebViewSizeObserverIfNeeded(on: webView)
         searchBridge.bind(webView: webView)
@@ -1615,6 +1627,10 @@ struct MarkdownWebView: NSViewRepresentable {
             searchBridge.invalidateZoomToFitCache()
             webView.loadHTMLString(html, baseURL: baseURL)
         }
+
+        // Apply window-background settings without forcing a reload so slider
+        // and colour-picker updates feel immediate.
+        context.coordinator.applyWindowBackgroundPreferencesIfNeeded(on: webView)
     }
 
     /// Navigation delegate object used by the web view.
@@ -1631,6 +1647,15 @@ struct MarkdownWebView: NSViewRepresentable {
         /// Bridge used to apply zoom updates with shared clamping rules.
         var searchBridge: MarkdownWebViewSearchBridge?
 
+        /// Requested window-background framing level (`0...1`).
+        var windowBackgroundVisibility: Double = AppPreferenceDefault.windowBackgroundVisibility
+
+        /// Raw persisted light-mode background colour (`#RRGGBB`).
+        var windowBackgroundColorLightHex: String = AppPreferenceDefault.windowBackgroundColorLightHex
+
+        /// Raw persisted dark-mode background colour (`#RRGGBB`).
+        var windowBackgroundColorDarkHex: String = AppPreferenceDefault.windowBackgroundColorDarkHex
+
         /// Fingerprint of last loaded HTML to avoid unnecessary reloads.
         var lastLoadedFingerprint = ""
 
@@ -1645,6 +1670,15 @@ struct MarkdownWebView: NSViewRepresentable {
 
         /// One-shot flag to fade in content after each newly started HTML load.
         private var shouldRevealAfterNextLoad = false
+
+        /// Last applied window-background framing level.
+        private var lastAppliedWindowBackgroundVisibility: Double?
+
+        /// Last applied light-mode custom-colour hex value.
+        private var lastAppliedWindowBackgroundColorLightHex: String?
+
+        /// Last applied dark-mode custom-colour hex value.
+        private var lastAppliedWindowBackgroundColorDarkHex: String?
 
         /// Weak reference to the currently monitored web view instance.
         private weak var monitoredWebView: WKWebView?
@@ -1891,6 +1925,9 @@ struct MarkdownWebView: NSViewRepresentable {
             // feels responsive even if fit-mode adjustment takes longer.
             revealAfterLoadIfNeeded(on: webView)
 
+            // Reapply preferences after each load because the DOM was rebuilt.
+            applyWindowBackgroundPreferencesIfNeeded(on: webView, force: true)
+
             guard shouldApplyInitialZoomToFitOnNextDidFinish else {
                 return
             }
@@ -1952,6 +1989,93 @@ struct MarkdownWebView: NSViewRepresentable {
 
             shouldRevealAfterNextLoad = false
             webView.alphaValue = 1.0
+        }
+
+        /// Applies user-selected window-background preferences to the web page.
+        ///
+        /// This avoids full HTML reloads for Settings changes and keeps updates
+        /// immediate while users drag the visibility slider.
+        func applyWindowBackgroundPreferencesIfNeeded(on webView: WKWebView, force: Bool = false) {
+            let clampedVisibility = max(0.0, min(1.0, windowBackgroundVisibility))
+            let normalizedLightHex = normalizedHexColor(
+                windowBackgroundColorLightHex,
+                fallback: AppPreferenceDefault.windowBackgroundColorLightHex
+            )
+            let normalizedDarkHex = normalizedHexColor(
+                windowBackgroundColorDarkHex,
+                fallback: AppPreferenceDefault.windowBackgroundColorDarkHex
+            )
+
+            let shouldApply = force ||
+                lastAppliedWindowBackgroundVisibility != clampedVisibility ||
+                lastAppliedWindowBackgroundColorLightHex != normalizedLightHex ||
+                lastAppliedWindowBackgroundColorDarkHex != normalizedDarkHex
+
+            guard shouldApply else {
+                return
+            }
+
+            lastAppliedWindowBackgroundVisibility = clampedVisibility
+            lastAppliedWindowBackgroundColorLightHex = normalizedLightHex
+            lastAppliedWindowBackgroundColorDarkHex = normalizedDarkHex
+
+            let visibilityLiteral = String(format: "%.4f", clampedVisibility)
+            let lightHexLiteral = SecurityHelpers.jsonStringLiteral(normalizedLightHex)
+            let darkHexLiteral = SecurityHelpers.jsonStringLiteral(normalizedDarkHex)
+
+            let script = """
+            (() => {
+                const root = document.documentElement;
+                const body = document.body;
+                if (!root || !body) { return; }
+
+                const visibility = \(visibilityLiteral);
+                root.style.setProperty(
+                    '--qmv-background-scale',
+                    String(Math.max(0, Math.min(1, visibility)))
+                );
+                root.style.setProperty('--qmv-background-custom-color-light', \(lightHexLiteral));
+                root.style.setProperty('--qmv-background-custom-color-dark', \(darkHexLiteral));
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    Logger.error("Failed to apply window background settings: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// Returns a safe `#RRGGBB` value suitable for CSS injection.
+        private func normalizedHexColor(_ candidate: String, fallback fallbackHex: String) -> String {
+            if let sanitized = sanitizedHexColor(candidate) {
+                return sanitized
+            }
+
+            if let fallback = sanitizedHexColor(fallbackHex) {
+                return fallback
+            }
+
+            return AppPreferenceDefault.windowBackgroundColorLightHex
+        }
+
+        /// Returns `#RRGGBB` when `candidate` is valid, otherwise `nil`.
+        private func sanitizedHexColor(_ candidate: String) -> String? {
+            let trimmed = candidate
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .uppercased()
+            let rawHex = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+
+            let isValidHex = rawHex.count == 6 &&
+                rawHex.allSatisfy { char in
+                    char.isHexDigit
+                }
+
+            if isValidHex {
+                return "#\(rawHex)"
+            }
+
+            return nil
         }
 
         /// Returns elapsed wall-clock time in milliseconds for profiling logs.
