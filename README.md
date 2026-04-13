@@ -94,7 +94,7 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - External links open in your default browser or mail app.
 - Local Markdown links open in a new Quick Markdown Viewer window.
 - Relative local images are rendered from the document folder.
-- Fenced-code syntax highlighting in Settings (off by default).
+- Syntax highlighting in Settings (for fenced code blocks only; off by default).
   - On-screen code uses the selected theme.
   - Print and PDF export always use that theme’s light-mode colours.
 - In-document search:

@@ -34,6 +34,7 @@ Quick Markdown Viewer v1 is intentionally minimal:
 - macOS only (Swift + SwiftUI)
 - `WKWebView` rendering surface
 - Bundled local `markdown-it` renderer (no CDN)
+- Bundled local `highlight.js` syntax highlighter (no CDN)
 - One document per window
 - File open, drag/drop, and Finder association
 - Native recent-documents menu (`File > Open Recent`)
@@ -228,6 +229,8 @@ GitHub (light/dark), with VS Code, Atom One, and Stack Overflow theme families
 also bundled for selection in Settings. For print and PDF export, syntax
 highlighting always resolves to the selected theme’s light variant so output
 remains print-friendly regardless of the active app appearance mode.
+Highlight enable/disable and theme switching are applied in place to existing
+code blocks, rather than by full-document rerender, to avoid page drift.
 
 ## Local Rendering and Security Model
 
