@@ -57,7 +57,25 @@
 
     const codeBlocks = container.querySelectorAll("pre code");
     codeBlocks.forEach((block) => {
+      if (block.classList.contains("hljs") || block.hasAttribute("data-highlighted")) {
+        return;
+      }
       window.hljs.highlightElement(block);
+    });
+  }
+
+  // Removes highlight.js token markup in place while preserving plain code text.
+  function clearSyntaxHighlighting(container) {
+    if (!container) {
+      return;
+    }
+
+    const codeBlocks = container.querySelectorAll("pre code");
+    codeBlocks.forEach((block) => {
+      const plainText = block.textContent || "";
+      block.textContent = plainText;
+      block.classList.remove("hljs");
+      block.removeAttribute("data-highlighted");
     });
   }
 
@@ -96,7 +114,16 @@
     }
 
     syntaxHighlightingEnabled = nextEnabled;
-    renderCurrentSource(true);
+    const container = document.getElementById("content");
+    if (!container) {
+      return;
+    }
+
+    if (syntaxHighlightingEnabled) {
+      applySyntaxHighlighting(container);
+    } else {
+      clearSyntaxHighlighting(container);
+    }
   }
 
   // Switches syntax theme family and reapplies highlights in place if needed.
@@ -107,8 +134,20 @@
     }
 
     applySyntaxThemeStyleState(nextTheme);
-    if (syntaxHighlightingEnabled) {
-      renderCurrentSource(true);
+    if (!syntaxHighlightingEnabled) {
+      return;
+    }
+
+    const container = document.getElementById("content");
+    if (!container) {
+      return;
+    }
+
+    const hasHighlightedCode = !!container.querySelector(
+      "pre code.hljs, pre code[data-highlighted]"
+    );
+    if (!hasHighlightedCode) {
+      applySyntaxHighlighting(container);
     }
   }
 
