@@ -347,7 +347,6 @@ own risk.
   - `⌘G` moves to the next match.
   - `Shift+⌘G` moves to the previous match.
   - `⌘E` uses current selection for Find.
-  - `⌘J` jumps to selection/query.
   - Search mode can be switched between case-insensitive and case-sensitive from the find-field magnifier menu.
 - Zoom shortcuts:
   - `⌘=` (or `⌘` + `+`) zooms in.

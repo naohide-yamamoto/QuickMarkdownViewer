@@ -102,7 +102,6 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
   - `⌘G` next
   - `Shift+⌘G` previous
   - `⌘E` use selection for find
-  - `⌘J` jump to selection
   - case-insensitive and case-sensitive modes
 - With the toolbar hidden, `⌘F` opens a compact native find panel with the same query/mode state as toolbar search.
 - Zoom controls:
@@ -129,7 +128,6 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - `⌘G`: find next
 - `Shift+⌘G`: find previous
 - `⌘E`: use selection for find
-- `⌘J`: jump to selection
 - `⌘P`: print
 - `⌘=`: zoom in
 - `⌘-`: zoom out

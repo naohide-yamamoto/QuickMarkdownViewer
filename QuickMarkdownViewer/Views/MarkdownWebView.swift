@@ -374,7 +374,6 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
     ///
     /// This powers macOS-standard Edit > Find actions:
     /// - Use Selection for Find (`Cmd+E`)
-    /// - Jump to Selection (`Cmd+J`)
     ///
     /// The result is trimmed and delivered on the callback as:
     /// - non-empty selected text

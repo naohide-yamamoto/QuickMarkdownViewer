@@ -412,13 +412,7 @@ struct DocumentWindowView: View {
         case .useSelectionForFind:
             // Mirror macOS behaviour: capture selected text and place it into
             // the Find query, then immediately highlight matches.
-            useSelectionForFind(shouldJump: false)
-
-        case .jumpToSelection:
-            // Prefer current selection when available; otherwise reuse existing
-            // query to perform the same "jump to next match" behaviour users
-            // expect from Cmd+J in document viewers/editors.
-            jumpToSelection()
+            useSelectionForFind()
 
         case .hideFindBar:
             clearFindFieldFocus()
@@ -749,10 +743,7 @@ struct DocumentWindowView: View {
     }
 
     /// Uses current web selection as the active Find query.
-    ///
-    /// - Parameter shouldJump: when true, immediately advances/jumps to the
-    ///   next active match (Cmd+J path). When false, just refreshes highlights.
-    private func useSelectionForFind(shouldJump: Bool) {
+    private func useSelectionForFind() {
         webViewSearchBridge.selectedText { selectedText in
             DispatchQueue.main.async {
                 guard let selectedText else {
@@ -764,40 +755,7 @@ struct DocumentWindowView: View {
                 findQuery = selectedText
                 hasAttemptedFind = false
                 didFindMatch = true
-
-                if shouldJump {
-                    runFind(direction: .forwards, shouldBeepOnNoMatch: true)
-                } else {
-                    runFind(direction: .forwards, shouldBeepOnNoMatch: false)
-                }
-            }
-        }
-    }
-
-    /// Jumps to selection/query match using standard macOS fallback order.
-    ///
-    /// Priority:
-    /// 1. If document text is selected, use that selection as Find query.
-    /// 2. Otherwise, if a Find query already exists, jump to next match.
-    /// 3. Otherwise, beep (nothing to jump to).
-    private func jumpToSelection() {
-        webViewSearchBridge.selectedText { selectedText in
-            DispatchQueue.main.async {
-                if let selectedText {
-                    findQuery = selectedText
-                    hasAttemptedFind = false
-                    didFindMatch = true
-                    runFind(direction: .forwards, shouldBeepOnNoMatch: true)
-                    return
-                }
-
-                let trimmedQuery = findQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !trimmedQuery.isEmpty else {
-                    NSSound.beep()
-                    return
-                }
-
-                runFind(direction: .forwards, shouldBeepOnNoMatch: true)
+                runFind(direction: .forwards, shouldBeepOnNoMatch: false)
             }
         }
     }

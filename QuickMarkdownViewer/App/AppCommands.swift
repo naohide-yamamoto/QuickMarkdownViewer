@@ -163,22 +163,13 @@ struct AppCommands: Commands {
                 }
                 .keyboardShortcut("g", modifiers: [.command, .shift])
 
-                // `Cmd+E` and `Cmd+J` are wired to macOS-standard selection
-                // workflows implemented in the active document window.
+                // `Cmd+E` follows macOS-standard selection-to-find workflow.
                 Button(action: {
                     routing.useSelectionForFindInActiveWindow()
                 }) {
                     Label("Use Selection for Find", systemImage: "text.cursor")
                 }
                 .keyboardShortcut("e", modifiers: .command)
-
-                // Viewfinder icon communicates "jump to highlighted target".
-                Button(action: {
-                    routing.jumpToSelectionInActiveWindow()
-                }) {
-                    Label("Jump to Selection", systemImage: "location.viewfinder")
-                }
-                .keyboardShortcut("j", modifiers: .command)
             } label: {
                 // Explicit icon keeps Find menu presentation consistent across
                 // empty and loaded-document windows in current macOS builds.

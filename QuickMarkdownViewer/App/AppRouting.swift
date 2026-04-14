@@ -34,9 +34,6 @@ enum QuickMarkdownViewerFindCommand: String {
     /// Capture current text selection and use it as the Find query.
     case useSelectionForFind
 
-    /// Jump to the next match for current selection/query.
-    case jumpToSelection
-
     /// Hide the find bar while preserving the current query text.
     case hideFindBar
 
@@ -1218,11 +1215,6 @@ final class AppRouting: ObservableObject {
     /// Copies current selection into Find query in the active window (`Cmd+E`).
     func useSelectionForFindInActiveWindow() {
         dispatchFindCommandToActiveWindow(.useSelectionForFind)
-    }
-
-    /// Jumps to selection/query match in the active window (`Cmd+J`).
-    func jumpToSelectionInActiveWindow() {
-        dispatchFindCommandToActiveWindow(.jumpToSelection)
     }
 
     /// Increases zoom in the currently active window (`Cmd` + `+`).
@@ -2885,7 +2877,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             return
         }
 
-        guard let toolbar = window.toolbar else {
+        guard window.toolbar != nil else {
             return
         }
 
@@ -2893,9 +2885,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         ignoreNextDisplayModeChange = true
         suppressSearchItemRebuildUntil = Date().addingTimeInterval(1.0)
 
-        if toolbar.isVisible {
-            closeFloatingFindPanel()
-        }
+        closeFloatingFindPanel()
         window.toggleToolbarShown(nil)
 
         DispatchQueue.main.async {
@@ -2911,6 +2901,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
 
     /// Opens native toolbar customisation palette.
     func openToolbarCustomisation() {
+        closeFloatingFindPanel()
         if let toolbar = window?.toolbar {
             toolbar.runCustomizationPalette(nil)
             return
@@ -2975,6 +2966,8 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
                 return
             }
 
+            // Prevent redundant duplicated Find UI after toolbar mode switches.
+            self.closeFloatingFindPanel()
             self.rebuildSearchToolbarItemIfNeeded(in: toolbar)
         }
     }
@@ -3084,6 +3077,8 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         if !isEnabled {
             closeFloatingFindPanel()
         }
+
+        window?.toolbar?.validateVisibleItems()
     }
 
     /// Resolves the currently inserted toolbar search field, if available.
@@ -3671,6 +3666,26 @@ extension DocumentWindowController: NSMenuItemValidation {
         }
 
         return true
+    }
+}
+
+extension DocumentWindowController: NSToolbarItemValidation {
+    func validateToolbarItem(_ item: NSToolbarItem) -> Bool {
+        switch item.itemIdentifier {
+        case ToolbarItemIdentifier.share,
+             ToolbarItemIdentifier.viewSource,
+             ToolbarItemIdentifier.zoomToFit,
+             ToolbarItemIdentifier.actualSize,
+             ToolbarItemIdentifier.print,
+             ToolbarItemIdentifier.exportPDF,
+             ToolbarItemIdentifier.search,
+             ToolbarItemIdentifier.zoomLegacy,
+             ToolbarItemIdentifier.zoomOutIn,
+             ToolbarItemIdentifier.printExportGroup:
+            return canUseDocumentControls
+        default:
+            return true
+        }
     }
 }
 
