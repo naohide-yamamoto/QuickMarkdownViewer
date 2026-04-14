@@ -251,7 +251,7 @@ explicitly clicks them, at which point they are handed off to the system
 browser or mail app rather than rendered inside Quick Markdown Viewer.
 
 Update checks follow the same opt-in principle:
-- `Check for Updates…` performs a user-initiated request to GitHub release metadata.
+- `Check for Updates…` performs a user-initiated request to GitHub for release metadata.
 - Automatic update checking is off by default.
 - If users enable automatic checking in Settings, Quick Markdown Viewer contacts GitHub only to fetch release metadata and does not download/install updates automatically.
 

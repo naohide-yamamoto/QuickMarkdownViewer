@@ -118,7 +118,7 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
   - If the selected app becomes unavailable, Quick Markdown Viewer falls back to the system default text editor.
 - `Check for Updates…` in the app menu, with optional automatic checking.
   - Automatic checking is off by default.
-  - When enabled, Quick Markdown Viewer contacts GitHub only to fetch release metadata.
+  - When enabled, Quick Markdown Viewer contacts GitHub only to check whether a newer version is available.
 
 ## Keyboard Shortcuts
 
