@@ -61,6 +61,9 @@ struct DocumentWindowView: View {
     /// True when the native search field currently owns keyboard focus.
     @State private var isFindFieldFocused = false
 
+    /// True when the next Find-state publish should request Find UI focus.
+    @State private var shouldFocusFindUIOnNextPublish = false
+
     /// User preference controlling how much outer background framing is visible.
     @AppStorage(
         AppPreferenceKey.windowBackgroundVisibility
@@ -715,12 +718,16 @@ struct DocumentWindowView: View {
             return
         }
 
+        let shouldFocusFindUI = shouldFocusFindUIOnNextPublish
+        shouldFocusFindUIOnNextPublish = false
+
         NotificationCenter.default.post(
             name: .quickMarkdownViewerFindStateDidChange,
             object: hostWindow,
             userInfo: [
                 QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue: findQuery,
-                QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isCaseSensitiveSearch
+                QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue: isCaseSensitiveSearch,
+                QuickMarkdownViewerFindCommandUserInfoKey.shouldFocusFindUI.rawValue: shouldFocusFindUI
             ]
         )
     }
@@ -753,6 +760,7 @@ struct DocumentWindowView: View {
                     return
                 }
 
+                shouldFocusFindUIOnNextPublish = true
                 findQuery = selectedText
                 hasAttemptedFind = false
                 didFindMatch = true

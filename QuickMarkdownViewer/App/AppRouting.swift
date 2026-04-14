@@ -66,6 +66,9 @@ enum QuickMarkdownViewerFindCommandUserInfoKey: String {
 
     /// True when Find failures should beep.
     case shouldBeepOnNoMatch
+
+    /// True when Find UI should expand/focus to reflect the updated query.
+    case shouldFocusFindUI
 }
 
 /// Supported in-document zoom actions for QuickMarkdownViewer windows.
@@ -3008,6 +3011,8 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
                 notification.userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.query.rawValue] as? String ?? ""
             let caseSensitive =
                 notification.userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.isCaseSensitive.rawValue] as? Bool ?? false
+            let shouldFocusFindUI =
+                notification.userInfo?[QuickMarkdownViewerFindCommandUserInfoKey.shouldFocusFindUI.rawValue] as? Bool ?? false
 
             Task { @MainActor in
                 guard let self else {
@@ -3017,6 +3022,16 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
                 self.currentFindQuery = query
                 self.isFindCaseSensitive = caseSensitive
                 self.syncFindControlsFromState()
+
+                guard shouldFocusFindUI else {
+                    return
+                }
+
+                guard !self.shouldPresentFloatingFindPanelForCurrentToolbarMode() else {
+                    return
+                }
+
+                self.focusToolbarSearchField()
             }
         }
     }
