@@ -1,5 +1,4 @@
 import AppKit
-import CoreServices
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -728,50 +727,15 @@ struct DocumentWindowView: View {
 
     /// Opens the source Markdown file in the system's default plain-text editor.
     ///
-    /// If no explicit plain-text editor can be resolved, we gracefully fall
-    /// back to TextEdit and then to the system-default file open path.
+    /// Uses the app selected in Settings > General > View source app.
+    /// Falls back to the system default text editor when needed.
     private func viewSourceExternally() {
         guard let sourceURL = documentState.document?.fileURL else {
             NSSound.beep()
             return
         }
 
-        let workspace = NSWorkspace.shared
-        let configuration = NSWorkspace.OpenConfiguration()
-        configuration.activates = true
-
-        // Resolve the default handler for `public.plain-text` directly via
-        // LaunchServices so behaviour matches system defaults (for example,
-        // BBEdit when users set it as their preferred plain-text editor).
-        let plainTextUTI = UTType.plainText.identifier as CFString
-        if let defaultPlainTextBundleID =
-            LSCopyDefaultRoleHandlerForContentType(plainTextUTI, .editor)?.takeRetainedValue() as String?,
-           let plainTextEditorURL = workspace.urlForApplication(withBundleIdentifier: defaultPlainTextBundleID) {
-            workspace.open([sourceURL], withApplicationAt: plainTextEditorURL, configuration: configuration) { _, error in
-                if let error {
-                    Logger.error("Opening source in default plain-text editor failed: \(error.localizedDescription)")
-                    DispatchQueue.main.async {
-                        NSSound.beep()
-                    }
-                }
-            }
-            return
-        }
-
-        if let textEditURL = workspace.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
-            workspace.open([sourceURL], withApplicationAt: textEditURL, configuration: configuration) { _, error in
-                if let error {
-                    Logger.error("Opening source in TextEdit failed: \(error.localizedDescription)")
-                    DispatchQueue.main.async {
-                        NSSound.beep()
-                    }
-                }
-            }
-            return
-        }
-
-        guard workspace.open(sourceURL) else {
-            Logger.error("Opening source via system fallback failed for \(sourceURL.path)")
+        guard AppRouting.shared.openSourceFileInPreferredApp(sourceURL) else {
             NSSound.beep()
             return
         }

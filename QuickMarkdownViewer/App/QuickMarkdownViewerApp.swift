@@ -120,6 +120,9 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Sentinel picker ID used for the bottom "Select…" action row.
     private static let selectDefaultViewerOptionID = "__qmv.selectDefaultViewer__"
 
+    /// Sentinel picker ID used for View Source app "Select…" action row.
+    private static let selectViewSourceAppOptionID = "__qmv.selectViewSourceApp__"
+
     /// Tabs shown in the Settings window.
     private enum SettingsTab: Hashable {
         case general
@@ -164,6 +167,12 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Selected bundle identifier for default Markdown viewer.
     @State private var selectedMarkdownViewerBundleID = ""
 
+    /// Available app options for View Source app selection.
+    @State private var viewSourceAppOptions: [AppRouting.ViewSourceAppOption] = []
+
+    /// Selected picker ID for View Source app.
+    @State private var selectedViewSourceAppID = ""
+
     /// Selected appearance preference in General tab.
     @State private var selectedAppearancePreference: AppRouting.AppearancePreference = .system
 
@@ -179,6 +188,9 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Suppresses one `onChange` pass for programmatic picker assignments.
     @State private var suppressNextMarkdownViewerSelectionChange = false
 
+    /// Suppresses one `onChange` pass for programmatic View Source picker assignments.
+    @State private var suppressNextViewSourceAppSelectionChange = false
+
     /// True when the reset-all confirmation alert should be shown.
     @State private var isShowingResetConfirmation = false
 
@@ -188,6 +200,11 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// True when the Appearance-tab reset confirmation alert should be shown.
     @State private var isShowingAppearanceResetConfirmation = false
 
+    /// Fixed control width used by app pickers in the General pane.
+    ///
+    /// Sized to fit "Quick Markdown Viewer" in full while remaining compact.
+    private let generalAppPickerWidth: CGFloat = 210
+
     private let appearanceRowLabelWidth: CGFloat = 160
 
     private var selectedSyntaxHighlightTheme: SyntaxHighlightTheme {
@@ -196,6 +213,74 @@ private struct QuickMarkdownViewerSettingsView: View {
 
     private var windowBackgroundVisibilityPercentage: Int {
         Int(round(windowBackgroundVisibility * 100))
+    }
+
+    /// Popup options used by the default Markdown-viewer control.
+    private var markdownViewerPopupOptions: [GeneralPaneAppPicker.Option] {
+        var result = markdownViewerOptions.map {
+            GeneralPaneAppPicker.Option(
+                id: $0.id,
+                title: $0.displayName,
+                icon: $0.icon,
+                isSeparator: false
+            )
+        }
+
+        if !markdownViewerOptions.isEmpty {
+            result.append(
+                GeneralPaneAppPicker.Option(
+                    id: "__qmv.separator.defaultViewer__",
+                    title: "",
+                    icon: nil,
+                    isSeparator: true
+                )
+            )
+        }
+
+        result.append(
+            GeneralPaneAppPicker.Option(
+                id: Self.selectDefaultViewerOptionID,
+                title: "Select…",
+                icon: nil,
+                isSeparator: false
+            )
+        )
+
+        return result
+    }
+
+    /// Popup options used by the View Source app control.
+    private var viewSourceAppPopupOptions: [GeneralPaneAppPicker.Option] {
+        var result = viewSourceAppOptions.map {
+            GeneralPaneAppPicker.Option(
+                id: $0.id,
+                title: $0.displayName,
+                icon: $0.icon,
+                isSeparator: false
+            )
+        }
+
+        if !viewSourceAppOptions.isEmpty {
+            result.append(
+                GeneralPaneAppPicker.Option(
+                    id: "__qmv.separator.viewSource__",
+                    title: "",
+                    icon: nil,
+                    isSeparator: true
+                )
+            )
+        }
+
+        result.append(
+            GeneralPaneAppPicker.Option(
+                id: Self.selectViewSourceAppOptionID,
+                title: "Select…",
+                icon: nil,
+                isSeparator: false
+            )
+        )
+
+        return result
     }
 
     private var lightBackgroundColourBinding: Binding<Color> {
@@ -229,27 +314,23 @@ private struct QuickMarkdownViewerSettingsView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Form {
-                Picker("Default Markdown viewer:", selection: $selectedMarkdownViewerBundleID) {
-                    ForEach(markdownViewerOptions) { option in
-                        Label {
-                            Text(option.displayName)
-                        } icon: {
-                            Image(nsImage: option.icon)
-                                .resizable()
-                                .interpolation(.high)
-                                .frame(width: 16, height: 16)
-                        }
-                        .tag(option.id)
-                    }
-
-                    if !markdownViewerOptions.isEmpty {
-                        Divider()
-                    }
-
-                    Text("Select…")
-                        .tag(Self.selectDefaultViewerOptionID)
+                LabeledContent("Default Markdown viewer:") {
+                    GeneralPaneAppPicker(
+                        selectionID: $selectedMarkdownViewerBundleID,
+                        options: markdownViewerPopupOptions
+                    )
+                    .frame(width: generalAppPickerWidth, height: 24)
+                    .disabled(markdownViewerOptions.isEmpty)
                 }
-                .disabled(markdownViewerOptions.isEmpty)
+
+                LabeledContent("View source with:") {
+                    GeneralPaneAppPicker(
+                        selectionID: $selectedViewSourceAppID,
+                        options: viewSourceAppPopupOptions
+                    )
+                    .frame(width: generalAppPickerWidth, height: 24)
+                    .disabled(viewSourceAppOptions.isEmpty)
+                }
 
                 LabeledContent("Updates:") {
                     VStack(alignment: .leading, spacing: 8) {
@@ -432,6 +513,34 @@ private struct QuickMarkdownViewerSettingsView: View {
 
             applyDefaultMarkdownViewerSelection(newBundleID)
         }
+        .onChange(of: selectedViewSourceAppID) { newSelectionID in
+            if suppressNextViewSourceAppSelectionChange {
+                suppressNextViewSourceAppSelectionChange = false
+                return
+            }
+
+            guard !isRefreshingGeneralTabState else {
+                return
+            }
+
+            guard !newSelectionID.isEmpty else {
+                return
+            }
+
+            if newSelectionID == Self.selectViewSourceAppOptionID {
+                if let selection = routing.promptForViewSourceAppSelection() {
+                    routing.setViewSourceAppForSettings(
+                        bundleIdentifier: selection.bundleIdentifier,
+                        appURL: selection.appURL
+                    )
+                }
+                refreshGeneralTabState()
+                return
+            }
+
+            routing.setViewSourceAppSelectionIDForSettings(newSelectionID)
+            refreshGeneralTabState()
+        }
         .onChange(of: selectedAppearancePreference) { newPreference in
             guard !isRefreshingGeneralTabState else {
                 return
@@ -476,6 +585,7 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Restores only settings shown in the General tab.
     private func resetGeneralSettingsToDefaults() {
         automaticUpdateCheckEnabled = AppPreferenceDefault.automaticUpdateCheckEnabled
+        routing.resetViewSourceAppPreferenceToSystemDefault()
         if let ownBundleIdentifier = Bundle.main.bundleIdentifier {
             applyDefaultMarkdownViewerSelection(ownBundleIdentifier)
         } else {
@@ -517,6 +627,19 @@ private struct QuickMarkdownViewerSettingsView: View {
 
         if shouldApplyDefaultSelection, selectedMarkdownViewerBundleID != defaultBundleID {
             setSelectedMarkdownViewerBundleIDSilently(defaultBundleID)
+        }
+
+        viewSourceAppOptions = routing.viewSourceAppOptions()
+        let preferredViewSourceSelectionID = routing.viewSourceAppSelectionIDForSettings()
+        let resolvedViewSourceSelectionID: String
+        if viewSourceAppOptions.contains(where: { $0.id == preferredViewSourceSelectionID }) {
+            resolvedViewSourceSelectionID = preferredViewSourceSelectionID
+        } else {
+            resolvedViewSourceSelectionID = viewSourceAppOptions.first?.id ?? ""
+        }
+
+        if selectedViewSourceAppID != resolvedViewSourceSelectionID {
+            setSelectedViewSourceAppIDSilently(resolvedViewSourceSelectionID)
         }
 
         selectedAppearancePreference = routing.appearancePreferenceForSettings()
@@ -564,6 +687,16 @@ private struct QuickMarkdownViewerSettingsView: View {
 
         suppressNextMarkdownViewerSelectionChange = true
         selectedMarkdownViewerBundleID = bundleID
+    }
+
+    /// Updates View Source picker selection without triggering its change handler.
+    private func setSelectedViewSourceAppIDSilently(_ selectionID: String) {
+        guard selectedViewSourceAppID != selectionID else {
+            return
+        }
+
+        suppressNextViewSourceAppSelectionChange = true
+        selectedViewSourceAppID = selectionID
     }
 
     /// Shared row layout used by Appearance pane for fixed right-aligned labels.
@@ -614,6 +747,99 @@ private struct QuickMarkdownViewerSettingsView: View {
             max(0, min(255, green)),
             max(0, min(255, blue))
         )
+    }
+}
+
+/// Native popup picker used in the General pane.
+///
+/// Using one AppKit-backed control for both app pickers guarantees identical
+/// visual sizing (width/height/font) and alignment.
+private struct GeneralPaneAppPicker: NSViewRepresentable {
+    struct Option: Equatable {
+        let id: String
+        let title: String
+        let icon: NSImage?
+        let isSeparator: Bool
+    }
+
+    @Binding var selectionID: String
+    let options: [Option]
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(selectionID: $selectionID)
+    }
+
+    func makeNSView(context: Context) -> NSPopUpButton {
+        let button = NSPopUpButton(frame: .zero, pullsDown: false)
+        button.autoenablesItems = false
+        button.controlSize = .regular
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        button.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        button.target = context.coordinator
+        button.action = #selector(Coordinator.selectionDidChange(_:))
+        return button
+    }
+
+    func updateNSView(_ button: NSPopUpButton, context: Context) {
+        let coordinator = context.coordinator
+        coordinator.isUpdating = true
+        defer { coordinator.isUpdating = false }
+
+        if coordinator.cachedOptions != options {
+            coordinator.cachedOptions = options
+            button.removeAllItems()
+            let menu = NSMenu()
+            for option in options {
+                if option.isSeparator {
+                    menu.addItem(.separator())
+                    continue
+                }
+
+                let item = NSMenuItem(title: option.title, action: nil, keyEquivalent: "")
+                item.representedObject = option.id
+                if let icon = option.icon {
+                    let sizedIcon = icon.copy() as? NSImage ?? icon
+                    sizedIcon.size = NSSize(width: 16, height: 16)
+                    item.image = sizedIcon
+                }
+                menu.addItem(item)
+            }
+            button.menu = menu
+        }
+
+        if let targetItem = button.menu?.items.first(where: {
+            ($0.representedObject as? String) == selectionID
+        }) {
+            button.select(targetItem)
+        } else if let fallbackItem = button.menu?.items.first(where: {
+            ($0.representedObject as? String) != nil
+        }) {
+            button.select(fallbackItem)
+        } else {
+            button.select(nil)
+        }
+    }
+
+    final class Coordinator: NSObject {
+        @Binding var selectionID: String
+        var cachedOptions: [Option] = []
+        var isUpdating = false
+
+        init(selectionID: Binding<String>) {
+            _selectionID = selectionID
+        }
+
+        @objc
+        func selectionDidChange(_ sender: NSPopUpButton) {
+            guard !isUpdating else {
+                return
+            }
+            guard let selectedID = sender.selectedItem?.representedObject as? String else {
+                return
+            }
+            selectionID = selectedID
+        }
     }
 }
 

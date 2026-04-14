@@ -452,6 +452,43 @@ final class AppRouting: ObservableObject {
         let icon: NSImage
     }
 
+    /// One selectable app option for "View Source app" in Settings.
+    struct ViewSourceAppOption: Identifiable {
+        /// Stable picker identifier (`system-default` sentinel or bundle ID).
+        let id: String
+
+        /// User-facing app name shown in Settings.
+        let displayName: String
+
+        /// App icon shown in the source-viewer picker.
+        let icon: NSImage
+    }
+
+    /// Persisted preference describing which app should handle "View Source".
+    struct ViewSourceAppPreference: Equatable {
+        /// Backing preference mode.
+        enum Mode: String {
+            case systemDefault
+            case customApp
+        }
+
+        /// Current preference mode.
+        let mode: Mode
+
+        /// Bundle identifier for custom-app mode.
+        let bundleIdentifier: String?
+
+        /// Optional security-scoped bookmark for selected app URL.
+        let appBookmarkData: Data?
+
+        /// Convenience value for the default "follow system text editor" mode.
+        static let systemDefault = ViewSourceAppPreference(
+            mode: .systemDefault,
+            bundleIdentifier: nil,
+            appBookmarkData: nil
+        )
+    }
+
     /// User-facing appearance preference used in Settings.
     enum AppearancePreference: String, CaseIterable, Identifiable {
         case system
@@ -544,9 +581,38 @@ final class AppRouting: ObservableObject {
     private let automaticUpdateLastCheckDateDefaultsKey =
         "QuickMarkdownViewer.AutomaticUpdateCheck.LastCheckedAt.v1"
 
+    /// Defaults key storing View Source app preference mode.
+    private let viewSourceAppPreferenceModeDefaultsKey =
+        "QuickMarkdownViewer.ViewSourceAppPreference.Mode.v1"
+
+    /// Defaults key storing selected View Source app bundle identifier.
+    private let viewSourceAppBundleIdentifierDefaultsKey =
+        "QuickMarkdownViewer.ViewSourceAppPreference.BundleIdentifier.v1"
+
+    /// Defaults key storing selected View Source app bookmark data.
+    private let viewSourceAppBookmarkDefaultsKey =
+        "QuickMarkdownViewer.ViewSourceAppPreference.AppBookmark.v1"
+
     /// Defaults key storing last directory used by the app chooser panel.
     private let defaultViewerOpenPanelLastDirectoryDefaultsKey =
         "QuickMarkdownViewer.DefaultViewerOpenPanel.LastDirectory.v1"
+
+    /// Defaults key storing last directory used by View Source app chooser.
+    private let viewSourceOpenPanelLastDirectoryDefaultsKey =
+        "QuickMarkdownViewer.ViewSourceAppOpenPanel.LastDirectory.v1"
+
+    /// Sentinel picker ID representing "follow system default text editor".
+    private let viewSourceSystemDefaultOptionID = "__qmv.viewSource.systemDefault__"
+
+    /// Preferred order of editor apps exposed in "View Source app" Settings picker.
+    private let preferredViewSourceEditorBundleIdentifiers = [
+        "com.microsoft.VSCode",
+        "com.barebones.bbedit",
+        "com.sublimetext.4",
+        "com.coteditor.CotEditor",
+        "com.apple.TextEdit",
+        "dev.zed.Zed"
+    ]
 
     /// GitHub API endpoint used for manual/automatic update checks.
     private let latestReleaseAPIURL = URL(
@@ -836,6 +902,201 @@ final class AppRouting: ObservableObject {
         persistDefaultViewerOpenPanelDirectory(appURL.deletingLastPathComponent())
 
         return bundleIdentifier
+    }
+
+    /// Returns all installed app options suitable for "View Source" handling.
+    ///
+    /// The first option always represents the system default plain-text editor.
+    /// Additional options include common code/text editors when installed.
+    func viewSourceAppOptions() -> [ViewSourceAppOption] {
+        var options: [ViewSourceAppOption] = []
+        let preference = resolvedViewSourceAppPreferenceForUse()
+        let systemDefaultBundleID = systemDefaultTextEditorAppDetails()?.bundleIdentifier
+
+        if let (systemBundleID, systemAppURL) = systemDefaultTextEditorAppDetails() {
+            options.append(
+                ViewSourceAppOption(
+                    id: viewSourceSystemDefaultOptionID,
+                    displayName: appDisplayName(for: systemAppURL, bundleIdentifier: systemBundleID),
+                    icon: scaledApplicationIcon(for: systemAppURL)
+                )
+            )
+        } else {
+            options.append(
+                ViewSourceAppOption(
+                    id: viewSourceSystemDefaultOptionID,
+                    displayName: "System Default Text Editor",
+                    icon: scaledApplicationIcon(for: nil)
+                )
+            )
+        }
+
+        for bundleID in preferredViewSourceEditorBundleIdentifiers {
+            if bundleID == systemDefaultBundleID {
+                continue
+            }
+
+            guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+                continue
+            }
+
+            options.append(
+                ViewSourceAppOption(
+                    id: bundleID,
+                    displayName: appDisplayName(for: appURL, bundleIdentifier: bundleID),
+                    icon: scaledApplicationIcon(for: appURL)
+                )
+            )
+        }
+
+        if preference.mode == .customApp,
+           let selectedBundleID = preference.bundleIdentifier,
+           !options.contains(where: { $0.id == selectedBundleID }),
+           let appURL = resolvedViewSourceCustomAppURL(from: preference) {
+            options.append(
+                ViewSourceAppOption(
+                    id: selectedBundleID,
+                    displayName: appDisplayName(for: appURL, bundleIdentifier: selectedBundleID),
+                    icon: scaledApplicationIcon(for: appURL)
+                )
+            )
+        }
+
+        return options
+    }
+
+    /// Returns the current Settings picker selection ID for "View Source app".
+    func viewSourceAppSelectionIDForSettings() -> String {
+        let preference = resolvedViewSourceAppPreferenceForUse()
+        if preference.mode == .customApp,
+           let bundleID = preference.bundleIdentifier,
+           !bundleID.isEmpty {
+            return bundleID
+        }
+
+        return viewSourceSystemDefaultOptionID
+    }
+
+    /// Applies one "View Source app" selection from the Settings picker.
+    func setViewSourceAppSelectionIDForSettings(_ selectionID: String) {
+        if selectionID == viewSourceSystemDefaultOptionID {
+            resetViewSourceAppPreferenceToSystemDefault()
+            return
+        }
+
+        guard !selectionID.isEmpty else {
+            resetViewSourceAppPreferenceToSystemDefault()
+            return
+        }
+
+        let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: selectionID)
+        let preference = ViewSourceAppPreference(
+            mode: .customApp,
+            bundleIdentifier: selectionID,
+            appBookmarkData: makeSecurityScopedAppBookmarkData(for: appURL)
+        )
+        persistViewSourceAppPreference(preference)
+    }
+
+    /// Applies a custom app chosen via "Select…" in Settings.
+    func setViewSourceAppForSettings(bundleIdentifier: String, appURL: URL) {
+        let preference = ViewSourceAppPreference(
+            mode: .customApp,
+            bundleIdentifier: bundleIdentifier,
+            appBookmarkData: makeSecurityScopedAppBookmarkData(for: appURL)
+        )
+        persistViewSourceAppPreference(preference)
+    }
+
+    /// Clears custom View Source selection so app follows system default editor.
+    func resetViewSourceAppPreferenceToSystemDefault() {
+        persistViewSourceAppPreference(.systemDefault)
+    }
+
+    /// Prompts users to pick an app from `/Applications` for "View Source".
+    ///
+    /// Returns selected bundle identifier and app URL, or `nil` on cancel/failure.
+    func promptForViewSourceAppSelection() -> (bundleIdentifier: String, appURL: URL)? {
+        let panel = NSOpenPanel()
+        panel.title = "Select View Source App"
+        panel.message = ""
+        panel.prompt = "Select"
+        panel.directoryURL = viewSourceOpenPanelDirectoryURL() ??
+            URL(fileURLWithPath: "/Applications", isDirectory: true)
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.application]
+
+        guard panel.runModal() == .OK,
+              let appURL = panel.url else {
+            return nil
+        }
+
+        guard let bundleIdentifier = Bundle(url: appURL)?.bundleIdentifier,
+              !bundleIdentifier.isEmpty else {
+            showViewSourceAppSelectionFailureAlert()
+            return nil
+        }
+
+        persistViewSourceOpenPanelDirectory(appURL.deletingLastPathComponent())
+        return (bundleIdentifier: bundleIdentifier, appURL: appURL)
+    }
+
+    /// Opens one Markdown source file in the user-selected "View Source" app.
+    ///
+    /// Behaviour:
+    /// - If Settings is "System Default", use the system plain-text editor.
+    /// - If a custom app is selected, try that app first.
+    /// - If custom app resolution/open fails, fall back to system default.
+    @discardableResult
+    func openSourceFileInPreferredApp(_ sourceURL: URL) -> Bool {
+        let preference = resolvedViewSourceAppPreferenceForUse()
+
+        if preference.mode == .customApp,
+           let appURL = resolvedViewSourceCustomAppURL(from: preference) {
+            let configuration = NSWorkspace.OpenConfiguration()
+            configuration.activates = true
+
+            let startedSecurityScope = appURL.startAccessingSecurityScopedResource()
+            NSWorkspace.shared.open(
+                [sourceURL],
+                withApplicationAt: appURL,
+                configuration: configuration
+            ) { [weak self] _, error in
+                if startedSecurityScope {
+                    appURL.stopAccessingSecurityScopedResource()
+                }
+
+                if let error {
+                    Logger.error("Opening source in selected app failed: \(error.localizedDescription)")
+                    Task { @MainActor in
+                        _ = self?.openSourceFileInSystemDefaultTextEditor(sourceURL)
+                    }
+                }
+            }
+            return true
+        }
+
+        return openSourceFileInSystemDefaultTextEditor(sourceURL)
+    }
+
+    /// Returns a usable View Source app preference and clears stale custom apps.
+    ///
+    /// If a previously selected custom app no longer exists (for example,
+    /// uninstalled or moved), this auto-resets preference to system default.
+    private func resolvedViewSourceAppPreferenceForUse() -> ViewSourceAppPreference {
+        let preference = viewSourceAppPreference()
+        guard preference.mode == .customApp else {
+            return preference
+        }
+
+        if resolvedViewSourceCustomAppURL(from: preference) != nil {
+            return preference
+        }
+
+        persistViewSourceAppPreference(.systemDefault)
+        return .systemDefault
     }
 
     /// Opens each file URL in its own window.
@@ -2054,6 +2315,222 @@ final class AppRouting: ObservableObject {
             directoryURL.standardizedFileURL.path,
             forKey: defaultViewerOpenPanelLastDirectoryDefaultsKey
         )
+    }
+
+    /// Returns current View Source app preference from persistent defaults.
+    private func viewSourceAppPreference() -> ViewSourceAppPreference {
+        let modeRawValue = defaults.string(forKey: viewSourceAppPreferenceModeDefaultsKey)
+            ?? ViewSourceAppPreference.Mode.systemDefault.rawValue
+        let mode = ViewSourceAppPreference.Mode(rawValue: modeRawValue) ?? .systemDefault
+
+        switch mode {
+        case .systemDefault:
+            return .systemDefault
+
+        case .customApp:
+            guard let bundleIdentifier = defaults.string(forKey: viewSourceAppBundleIdentifierDefaultsKey),
+                  !bundleIdentifier.isEmpty else {
+                return .systemDefault
+            }
+
+            return ViewSourceAppPreference(
+                mode: .customApp,
+                bundleIdentifier: bundleIdentifier,
+                appBookmarkData: defaults.data(forKey: viewSourceAppBookmarkDefaultsKey)
+            )
+        }
+    }
+
+    /// Persists one View Source app preference snapshot.
+    private func persistViewSourceAppPreference(_ preference: ViewSourceAppPreference) {
+        defaults.set(preference.mode.rawValue, forKey: viewSourceAppPreferenceModeDefaultsKey)
+
+        switch preference.mode {
+        case .systemDefault:
+            defaults.removeObject(forKey: viewSourceAppBundleIdentifierDefaultsKey)
+            defaults.removeObject(forKey: viewSourceAppBookmarkDefaultsKey)
+
+        case .customApp:
+            if let bundleIdentifier = preference.bundleIdentifier, !bundleIdentifier.isEmpty {
+                defaults.set(bundleIdentifier, forKey: viewSourceAppBundleIdentifierDefaultsKey)
+            } else {
+                defaults.removeObject(forKey: viewSourceAppBundleIdentifierDefaultsKey)
+            }
+
+            if let appBookmarkData = preference.appBookmarkData {
+                defaults.set(appBookmarkData, forKey: viewSourceAppBookmarkDefaultsKey)
+            } else {
+                defaults.removeObject(forKey: viewSourceAppBookmarkDefaultsKey)
+            }
+        }
+    }
+
+    /// Returns one resolved URL for the selected custom View Source app.
+    ///
+    /// Resolution order:
+    /// 1. Stored security-scoped bookmark.
+    /// 2. Current app URL from bundle identifier lookup.
+    private func resolvedViewSourceCustomAppURL(from preference: ViewSourceAppPreference) -> URL? {
+        if let bookmarkData = preference.appBookmarkData {
+            var isStale = false
+            do {
+                let resolvedURL = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: [.withSecurityScope, .withoutUI],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                ).standardizedFileURL
+
+                if isStale,
+                   let bundleIdentifier = preference.bundleIdentifier {
+                    persistViewSourceAppPreference(
+                        ViewSourceAppPreference(
+                            mode: .customApp,
+                            bundleIdentifier: bundleIdentifier,
+                            appBookmarkData: makeSecurityScopedAppBookmarkData(for: resolvedURL)
+                        )
+                    )
+                }
+
+                return resolvedURL
+            } catch {
+                Logger.error("Resolving View Source app bookmark failed: \(error.localizedDescription)")
+            }
+        }
+
+        guard let bundleIdentifier = preference.bundleIdentifier else {
+            return nil
+        }
+
+        return NSWorkspace.shared
+            .urlForApplication(withBundleIdentifier: bundleIdentifier)?
+            .standardizedFileURL
+    }
+
+    /// Returns one bookmark payload for app URL access in sandboxed builds.
+    private func makeSecurityScopedAppBookmarkData(for appURL: URL?) -> Data? {
+        guard let appURL else {
+            return nil
+        }
+
+        if let securityScopedBookmark = try? appURL.bookmarkData(
+            options: [.withSecurityScope],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        ) {
+            return securityScopedBookmark
+        }
+
+        return try? appURL.bookmarkData(
+            options: [],
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+    }
+
+    /// Returns app details for the current system plain-text editor, if any.
+    private func systemDefaultTextEditorAppDetails() -> (bundleIdentifier: String, appURL: URL)? {
+        guard let bundleIdentifier = defaultPlainTextEditorBundleIdentifier(),
+              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)?
+                .standardizedFileURL else {
+            return nil
+        }
+
+        return (bundleIdentifier, appURL)
+    }
+
+    /// Returns current system-default bundle identifier for `public.plain-text`.
+    private func defaultPlainTextEditorBundleIdentifier() -> String? {
+        let plainTextUTI = UTType.plainText.identifier as CFString
+        return LSCopyDefaultRoleHandlerForContentType(plainTextUTI, .editor)?.takeRetainedValue() as String?
+    }
+
+    /// Opens source file with system default plain-text editor, then falls back.
+    private func openSourceFileInSystemDefaultTextEditor(_ sourceURL: URL) -> Bool {
+        let workspace = NSWorkspace.shared
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+
+        if let defaultPlainTextBundleID = defaultPlainTextEditorBundleIdentifier(),
+           let plainTextEditorURL = workspace.urlForApplication(withBundleIdentifier: defaultPlainTextBundleID) {
+            workspace.open([sourceURL], withApplicationAt: plainTextEditorURL, configuration: configuration) { _, error in
+                if let error {
+                    Logger.error("Opening source in system default text editor failed: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        NSSound.beep()
+                    }
+                }
+            }
+            return true
+        }
+
+        if let textEditURL = workspace.urlForApplication(withBundleIdentifier: "com.apple.TextEdit") {
+            workspace.open([sourceURL], withApplicationAt: textEditURL, configuration: configuration) { _, error in
+                if let error {
+                    Logger.error("Opening source in TextEdit failed: \(error.localizedDescription)")
+                    DispatchQueue.main.async {
+                        NSSound.beep()
+                    }
+                }
+            }
+            return true
+        }
+
+        guard workspace.open(sourceURL) else {
+            Logger.error("Opening source via system fallback failed for \(sourceURL.path)")
+            return false
+        }
+
+        return true
+    }
+
+    /// Returns app chooser's last-used directory for View Source selection.
+    private func viewSourceOpenPanelDirectoryURL() -> URL? {
+        guard
+            let storedPath = defaults.string(forKey: viewSourceOpenPanelLastDirectoryDefaultsKey),
+            !storedPath.isEmpty
+        else {
+            return nil
+        }
+
+        return URL(fileURLWithPath: storedPath, isDirectory: true)
+    }
+
+    /// Persists app chooser's last-used directory for View Source selection.
+    private func persistViewSourceOpenPanelDirectory(_ directoryURL: URL) {
+        defaults.set(
+            directoryURL.standardizedFileURL.path,
+            forKey: viewSourceOpenPanelLastDirectoryDefaultsKey
+        )
+    }
+
+    /// Presents warning when one selected View Source app cannot be resolved.
+    private func showViewSourceAppSelectionFailureAlert() {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Could not set the View Source app."
+        alert.informativeText =
+            "Quick Markdown Viewer could not resolve the selected application."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
+    }
+
+    /// Returns one 16pt app icon for Settings pickers.
+    private func scaledApplicationIcon(for appURL: URL?) -> NSImage {
+        let icon: NSImage
+        if let appURL {
+            icon = NSWorkspace.shared.icon(forFile: appURL.path)
+        } else if let symbol = NSImage(
+            systemSymbolName: "doc.plaintext",
+            accessibilityDescription: "Text Editor"
+        ) {
+            icon = symbol
+        } else {
+            icon = NSWorkspace.shared.icon(for: .application)
+        }
+
+        icon.size = NSSize(width: 16, height: 16)
+        return icon
     }
 
     /// Returns the active document URL suitable for command-driven actions.
@@ -3350,7 +3827,7 @@ extension DocumentWindowController: NSToolbarDelegate {
             let item = NSToolbarItem(itemIdentifier: itemIdentifier)
             item.label = "View Source"
             item.paletteLabel = "View Source"
-            item.toolTip = "Open source in default text editor"
+            item.toolTip = "Open source in selected app"
             item.image = NSImage(systemSymbolName: "doc.plaintext", accessibilityDescription: "View Source")
             item.target = self
             item.action = #selector(viewSourceFromToolbar(_:))
