@@ -40,7 +40,7 @@ Quick Markdown Viewer v1 is intentionally minimal:
 - Native recent-documents menu (`File > Open Recent`)
 - Native file sharing (`File > Share` and toolbar Share item)
 - Rendered print and PDF export commands
-- View-source handoff to the system default plain-text editor
+- Configurable view-source handoff (`Settings > General > View source with`) with fallback to the system default text editor
 - Native speech controls (`Edit > Speech`)
 - Native customisable AppKit toolbar (`NSToolbar`) with persisted item layout/display mode
 - Toolbar hide/show (`⌥⌘T`) and toolbar customisation (`View > Customise Toolbar…`)
@@ -331,11 +331,11 @@ own risk.
   - `File > Share` opens native macOS sharing services for the current file.
   - `⌘P` prints rendered Markdown content.
   - `File > Export as PDF…` exports rendered Markdown content as PDF.
-  - `File > View Source` opens the raw `.md` in the system default plain-text editor.
+  - `File > View Source` opens the raw `.md` in the app selected in `Settings > General > View source with` (with fallback to the system default text editor if the selected app is unavailable).
   - `Quick Markdown Viewer > Check for Updates…` checks GitHub release metadata.
 - Settings commands:
   - `⌘,` opens the Settings window.
-  - `General` pane controls manual/automatic update-check preferences.
+  - `General` pane controls default Markdown viewer, View Source app selection, manual/automatic update-check preferences, and reset actions.
   - `Appearance` pane controls window-background size/colour.
   - `Reset All Settings` in General restores all settings across panes.
 - Speech commands:

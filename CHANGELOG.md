@@ -9,8 +9,12 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 ### Added
 - App-menu `Check for Updates…` command under `Quick Markdown Viewer`, with native result dialogs.
 - Optional automatic update checking (off by default) that only requests GitHub release metadata.
+- Configurable `View source with` setting in `Settings > General`:
+  - choose an installed editor for `File > View Source`
+  - use `Select…` to choose another app from `/Applications`
+  - fall back to the system default text editor if the selected app is unavailable
 - Settings window with:
-  - `General` pane for update-check preferences
+  - `General` pane for default-app, View Source, and update-check preferences
   - `Appearance` pane for window-background controls
   - pane-scoped reset for Appearance plus a global reset action in General
 

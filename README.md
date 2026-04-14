@@ -115,7 +115,8 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - Print rendered Markdown (`⌘P`).
 - Export rendered Markdown as PDF.
 - Native speech controls under `Edit > Speech` (`Start Speaking` / `Stop Speaking`).
-- View raw source in your default plain-text editor.
+- View raw source in the app selected in `Settings > General > View source with`.
+  - If the selected app becomes unavailable, Quick Markdown Viewer falls back to the system default text editor.
 - `Check for Updates…` in the app menu, with optional automatic checking.
   - Automatic checking is off by default.
   - When enabled, Quick Markdown Viewer contacts GitHub only to fetch release metadata.
