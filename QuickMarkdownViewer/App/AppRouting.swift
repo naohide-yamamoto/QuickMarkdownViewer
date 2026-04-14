@@ -2692,6 +2692,9 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     /// This intentionally excludes non-inserted palette preview instances.
     private weak var toolbarSearchField: NSSearchField?
 
+    /// Native AppKit Search toolbar item when Search is shown as field/icon.
+    private weak var toolbarSearchToolbarItem: NSSearchToolbarItem?
+
     /// Floating Find panel shown when toolbar is hidden.
     private var floatingFindPanel: NSPanel?
 
@@ -3076,10 +3079,17 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         guard let toolbar = managedToolbar,
               let searchItem = toolbar.items.first(where: { $0.itemIdentifier == ToolbarItemIdentifier.search }) else {
             toolbarSearchField = nil
+            toolbarSearchToolbarItem = nil
             return
         }
 
-        toolbarSearchField = searchItem.view as? NSSearchField
+        if let nativeSearchItem = searchItem as? NSSearchToolbarItem {
+            toolbarSearchToolbarItem = nativeSearchItem
+            toolbarSearchField = nativeSearchItem.searchField
+        } else {
+            toolbarSearchToolbarItem = nil
+            toolbarSearchField = searchItem.view as? NSSearchField
+        }
         searchToolbarGenericItem = searchItem
     }
 
@@ -3097,8 +3107,11 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         }
 
         let isTextOnlyMode = toolbar.displayMode == .labelOnly
-        let hasSearchFieldView = toolbar.items[searchIndex].view is NSSearchField
-        if (isTextOnlyMode && !hasSearchFieldView) || (!isTextOnlyMode && hasSearchFieldView) {
+        let currentItem = toolbar.items[searchIndex]
+        let isNativeSearchToolbarItem = currentItem is NSSearchToolbarItem
+        let shouldUseNativeSearchToolbarItem = !isTextOnlyMode
+
+        if isNativeSearchToolbarItem == shouldUseNativeSearchToolbarItem {
             return
         }
 
@@ -3112,6 +3125,10 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     private func isSearchPresentedAsActionItem() -> Bool {
         guard let toolbar = managedToolbar,
               let searchItem = toolbar.items.first(where: { $0.itemIdentifier == ToolbarItemIdentifier.search }) else {
+            return false
+        }
+
+        if searchItem is NSSearchToolbarItem {
             return false
         }
 
@@ -3132,15 +3149,6 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         }
 
         if managedToolbar?.displayMode == .labelOnly {
-            return true
-        }
-
-        resolveToolbarSearchReferences()
-        guard let toolbarSearchField else {
-            return true
-        }
-
-        if toolbarSearchField.window == nil || toolbarSearchField.superview == nil {
             return true
         }
 
@@ -3216,6 +3224,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             return
         }
 
+        toolbarSearchToolbarItem?.beginSearchInteraction()
         closeFloatingFindPanel()
         syncFindControlsFromState()
         window?.makeFirstResponder(toolbarSearchField)
@@ -3769,26 +3778,34 @@ extension DocumentWindowController: NSToolbarDelegate {
             return group
 
         case ToolbarItemIdentifier.search:
-            let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-            item.label = "Search"
-            item.paletteLabel = "Search"
-            item.toolTip = "Search the current document"
-            item.isEnabled = canUseDocumentControls
-
             if toolbar.displayMode == .labelOnly {
+                let item = NSToolbarItem(itemIdentifier: itemIdentifier)
+                item.label = "Search"
+                item.paletteLabel = "Search"
+                item.toolTip = "Search the current document"
+                item.isEnabled = canUseDocumentControls
                 item.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: "Search")
                 item.target = self
                 item.action = #selector(handleSearchToolbarItemActivation(_:))
 
                 if flag {
                     toolbarSearchField = nil
+                    toolbarSearchToolbarItem = nil
                     searchToolbarGenericItem = item
                 }
 
                 return item
             }
 
-            let searchField = NSSearchField(frame: NSRect(x: 0, y: 0, width: 220, height: 0))
+            let item = NSSearchToolbarItem(itemIdentifier: itemIdentifier)
+            item.label = "Search"
+            item.paletteLabel = "Search"
+            item.toolTip = "Search the current document"
+            item.visibilityPriority = .high
+            item.preferredWidthForSearchField = 220
+            item.resignsFirstResponderWithCancel = true
+
+            let searchField = item.searchField
             searchField.controlSize = .small
             searchField.delegate = self
             searchField.sendsSearchStringImmediately = true
@@ -3798,12 +3815,9 @@ extension DocumentWindowController: NSToolbarDelegate {
             searchField.stringValue = currentFindQuery
             searchField.isEnabled = canUseDocumentControls
 
-            item.view = searchField
-            item.target = self
-            item.action = #selector(handleSearchToolbarItemActivation(_:))
-
             if flag {
                 toolbarSearchField = searchField
+                toolbarSearchToolbarItem = item
                 searchToolbarGenericItem = item
             }
 
