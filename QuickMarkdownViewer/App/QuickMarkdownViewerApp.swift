@@ -25,6 +25,13 @@ enum AppPreferenceKey {
 
     /// Selected syntax-highlighting theme family.
     static let syntaxHighlightingTheme = "qmv.syntaxHighlightingTheme"
+
+    /// Selected document typeface for rendered Markdown typography.
+    static let documentTypeface = "qmv.documentTypeface"
+
+    /// Selected document density variant.
+    static let documentDensity = "qmv.documentDensity"
+
 }
 
 /// Default values for app-level settings.
@@ -46,6 +53,62 @@ enum AppPreferenceDefault {
 
     /// Default syntax-highlighting theme: GitHub.
     static let syntaxHighlightingTheme = SyntaxHighlightTheme.github.rawValue
+
+    /// Default document typeface.
+    static let documentTypeface = DocumentTypeface.sansSerif.rawValue
+
+    /// Default document density.
+    static let documentDensity = DocumentDensity.standard.rawValue
+}
+
+/// Available document typefaces for rendered Markdown typography.
+enum DocumentTypeface: String, CaseIterable, Identifiable {
+    case sansSerif = "sans-serif"
+    case serif
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .sansSerif:
+            return "Sans-serif"
+        case .serif:
+            return "Serif"
+        }
+    }
+
+    static func resolved(from rawValue: String) -> Self {
+        let normalizedRawValue = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return DocumentTypeface(rawValue: normalizedRawValue) ?? .sansSerif
+    }
+}
+
+/// Available density variants for rendered Markdown typography.
+enum DocumentDensity: String, CaseIterable, Identifiable {
+    case standard
+    case compact
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .standard:
+            return "Standard"
+        case .compact:
+            return "Compact"
+        }
+    }
+
+    static func resolved(from rawValue: String) -> Self {
+        let normalizedRawValue = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return DocumentDensity(rawValue: normalizedRawValue) ?? .standard
+    }
 }
 
 /// Available syntax-highlighting theme families.
@@ -156,6 +219,14 @@ private struct QuickMarkdownViewerSettingsView: View {
         AppPreferenceKey.syntaxHighlightingTheme
     ) private var syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
 
+    @AppStorage(
+        AppPreferenceKey.documentTypeface
+    ) private var documentTypefaceRawValue = AppPreferenceDefault.documentTypeface
+
+    @AppStorage(
+        AppPreferenceKey.documentDensity
+    ) private var documentDensityRawValue = AppPreferenceDefault.documentDensity
+
     @Environment(\.colorScheme) private var colorScheme
 
     /// Selected Settings tab.
@@ -209,6 +280,14 @@ private struct QuickMarkdownViewerSettingsView: View {
 
     private var selectedSyntaxHighlightTheme: SyntaxHighlightTheme {
         SyntaxHighlightTheme.resolved(from: syntaxHighlightingThemeRawValue)
+    }
+
+    private var selectedDocumentTypeface: DocumentTypeface {
+        DocumentTypeface.resolved(from: documentTypefaceRawValue)
+    }
+
+    private var selectedDocumentDensity: DocumentDensity {
+        DocumentDensity.resolved(from: documentDensityRawValue)
     }
 
     private var windowBackgroundVisibilityPercentage: Int {
@@ -386,6 +465,24 @@ private struct QuickMarkdownViewerSettingsView: View {
                     }
                     .padding(.vertical, 4)
 
+                    appearancePaneRow("Background colour:", alignment: .center) {
+                        HStack(spacing: 8) {
+                            Text("Light:")
+                                .foregroundStyle(.secondary)
+                            ColorPicker("Light", selection: lightBackgroundColourBinding)
+                                .labelsHidden()
+
+                            Color.clear
+                                .frame(width: 12, height: 1)
+
+                            Text("Dark:")
+                                .foregroundStyle(.secondary)
+                            ColorPicker("Dark", selection: darkBackgroundColourBinding)
+                                .labelsHidden()
+                        }
+                    }
+                    .padding(.vertical, 4)
+
                     appearancePaneRow("Visible background:") {
                         HStack(spacing: 12) {
                             Slider(
@@ -416,42 +513,60 @@ private struct QuickMarkdownViewerSettingsView: View {
                     }
                     .padding(.vertical, 2)
 
-                    appearancePaneRow("Background colour:") {
+                    appearancePaneRow("Document style:", alignment: .center) {
                         HStack(spacing: 16) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Light")
-                                ColorPicker("Light", selection: lightBackgroundColourBinding)
-                                    .labelsHidden()
+                            HStack(spacing: 2) {
+                                Text("Typeface:")
+                                    .foregroundStyle(.secondary)
+                                Picker("", selection: $documentTypefaceRawValue) {
+                                    ForEach(DocumentTypeface.allCases) { typeface in
+                                        Text(typeface.displayName).tag(typeface.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 140)
                             }
 
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Dark")
-                                ColorPicker("Dark", selection: darkBackgroundColourBinding)
-                                    .labelsHidden()
+                            HStack(spacing: 2) {
+                                Text("Density:")
+                                    .foregroundStyle(.secondary)
+                                Picker("", selection: $documentDensityRawValue) {
+                                    ForEach(DocumentDensity.allCases) { density in
+                                        Text(density.displayName).tag(density.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 120)
                             }
                         }
                     }
                     .padding(.vertical, 4)
 
                     appearancePaneRow("Syntax highlighting:") {
-                        Toggle("Highlight code blocks", isOn: $syntaxHighlightingEnabled)
-                    }
-                    .padding(.vertical, 4)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle("Highlight code blocks", isOn: $syntaxHighlightingEnabled)
 
-                    appearancePaneRow("Syntax theme:", alignment: .center) {
-                        Picker("", selection: $syntaxHighlightingThemeRawValue) {
-                            ForEach(SyntaxHighlightTheme.allCases) { theme in
-                                Text(theme.displayName).tag(theme.rawValue)
+                            HStack(spacing: 2) {
+                                Text("Theme:")
+                                    .foregroundStyle(.secondary)
+                                Picker("", selection: $syntaxHighlightingThemeRawValue) {
+                                    ForEach(SyntaxHighlightTheme.allCases) { theme in
+                                        Text(theme.displayName).tag(theme.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .frame(width: 170)
+                                .disabled(!syntaxHighlightingEnabled)
                             }
                         }
-                        .labelsHidden()
-                        .disabled(!syntaxHighlightingEnabled)
                     }
                     .padding(.vertical, 4)
 
                     appearancePaneRow("") {
                         SyntaxHighlightPreviewPanel(
                             theme: selectedSyntaxHighlightTheme,
+                            typeface: selectedDocumentTypeface,
+                            density: selectedDocumentDensity,
                             isHighlightingEnabled: syntaxHighlightingEnabled,
                             isDarkMode: colorScheme == .dark
                         )
@@ -593,7 +708,7 @@ private struct QuickMarkdownViewerSettingsView: View {
         }
     }
 
-    /// Restores only window-background controls in the Appearance tab.
+    /// Restores only settings shown in the Appearance pane.
     private func resetBackgroundSettingsToDefaults() {
         routing.resetAppearancePreferenceToSystemDefault()
         selectedAppearancePreference = routing.appearancePreferenceForSettings()
@@ -602,6 +717,8 @@ private struct QuickMarkdownViewerSettingsView: View {
         windowBackgroundColorDarkHex = AppPreferenceDefault.windowBackgroundColorDarkHex
         syntaxHighlightingEnabled = AppPreferenceDefault.syntaxHighlightingEnabled
         syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
+        documentTypefaceRawValue = AppPreferenceDefault.documentTypeface
+        documentDensityRawValue = AppPreferenceDefault.documentDensity
     }
 
     /// Refreshes General-tab controls from current system/app state.
@@ -846,18 +963,18 @@ private struct GeneralPaneAppPicker: NSViewRepresentable {
 /// Compact syntax-highlighting preview shown in the Appearance pane.
 private struct SyntaxHighlightPreviewPanel: View {
     let theme: SyntaxHighlightTheme
+    let typeface: DocumentTypeface
+    let density: DocumentDensity
     let isHighlightingEnabled: Bool
     let isDarkMode: Bool
     @State private var measuredHeight: CGFloat = 66
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Theme preview")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
+        VStack(alignment: .leading, spacing: 0) {
             SyntaxHighlightPreviewWebView(
                 theme: theme,
+                typeface: typeface,
+                density: density,
                 isHighlightingEnabled: isHighlightingEnabled,
                 isDarkMode: isDarkMode
             ) { newHeight in
@@ -880,6 +997,8 @@ private struct SyntaxHighlightPreviewPanel: View {
 /// Native web preview so settings reflect the exact bundled highlight theme CSS.
 private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
     let theme: SyntaxHighlightTheme
+    let typeface: DocumentTypeface
+    let density: DocumentDensity
     let isHighlightingEnabled: Bool
     let isDarkMode: Bool
     let onMeasuredHeight: (CGFloat) -> Void
@@ -905,6 +1024,8 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         let html = makeHTML(
             theme: theme,
+            typeface: typeface,
+            density: density,
             isHighlightingEnabled: isHighlightingEnabled,
             isDarkMode: isDarkMode
         )
@@ -919,6 +1040,8 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
 
     private func makeHTML(
         theme: SyntaxHighlightTheme,
+        typeface: DocumentTypeface,
+        density: DocumentDensity,
         isHighlightingEnabled: Bool,
         isDarkMode: Bool
     ) -> String {
@@ -935,6 +1058,8 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
         ].joined(separator: "\n")
         let escapedSnippet = escapeHTML(snippetSource)
         let codeClass = isHighlightingEnabled ? "hljs language-swift" : ""
+        let previewTypefaceClass = "qmv-typeface-\(typeface.rawValue)"
+        let previewDensityClass = "qmv-density-\(density.rawValue)"
         let highlightBootstrapScript = isHighlightingEnabled ? """
             <script>
               \(highlightJavaScript)
@@ -996,7 +1121,7 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
             </style>
           </head>
           <body>
-            <pre class="preview"><code id="preview-code" class="\(codeClass)">\(escapedSnippet)</code></pre>
+            <pre class="preview \(previewTypefaceClass) \(previewDensityClass)"><code id="preview-code" class="\(codeClass)">\(escapedSnippet)</code></pre>
             \(highlightBootstrapScript)
           </body>
         </html>

@@ -71,6 +71,22 @@ struct MarkdownRenderService {
         let syntaxHighlightingThemeJSON = SecurityHelpers.jsonStringLiteral(
             syntaxHighlightingThemeRawValue
         )
+        let documentTypefaceRawValue = DocumentTypeface.resolved(
+            from: UserDefaults.standard.string(
+                forKey: AppPreferenceKey.documentTypeface
+            ) ?? AppPreferenceDefault.documentTypeface
+        ).rawValue
+        let documentTypefaceJSON = SecurityHelpers.jsonStringLiteral(
+            documentTypefaceRawValue
+        )
+        let documentDensityRawValue = DocumentDensity.resolved(
+            from: UserDefaults.standard.string(
+                forKey: AppPreferenceKey.documentDensity
+            ) ?? AppPreferenceDefault.documentDensity
+        ).rawValue
+        let documentDensityJSON = SecurityHelpers.jsonStringLiteral(
+            documentDensityRawValue
+        )
 
         return indexTemplate
             .replacingOccurrences(of: "{{STYLES_CSS}}", with: styles)
@@ -102,6 +118,14 @@ struct MarkdownRenderService {
             .replacingOccurrences(
                 of: "{{SYNTAX_HIGHLIGHTING_THEME_JSON}}",
                 with: syntaxHighlightingThemeJSON
+            )
+            .replacingOccurrences(
+                of: "{{DOCUMENT_TYPEFACE_JSON}}",
+                with: documentTypefaceJSON
+            )
+            .replacingOccurrences(
+                of: "{{DOCUMENT_DENSITY_JSON}}",
+                with: documentDensityJSON
             )
     }
 

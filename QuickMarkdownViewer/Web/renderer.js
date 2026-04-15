@@ -15,12 +15,18 @@
   let currentSource = "";
   let syntaxHighlightingEnabled = false;
   let syntaxHighlightTheme = "github";
+  let documentTypeface = "sans-serif";
+  let documentDensity = "standard";
   const highlightThemeStyleIDs = {
     github: "qmv-highlight-theme-github",
     vscode: "qmv-highlight-theme-vscode",
     atomOne: "qmv-highlight-theme-atom-one",
     stackOverflow: "qmv-highlight-theme-stackoverflow"
   };
+  const documentTypefaceBodyClassPrefix = "qmv-typeface-";
+  const supportedDocumentTypefaces = ["sans-serif", "serif"];
+  const documentDensityBodyClassPrefix = "qmv-density-";
+  const supportedDocumentDensities = ["standard", "compact"];
 
   function resolveSyntaxHighlightTheme(value) {
     if (typeof value !== "string") {
@@ -47,6 +53,64 @@
 
       styleElement.disabled = themeKey !== resolvedTheme;
     });
+  }
+
+  function resolveDocumentTypeface(value) {
+    if (typeof value !== "string") {
+      return "sans-serif";
+    }
+
+    const trimmed = value.trim().toLowerCase();
+    if (supportedDocumentTypefaces.includes(trimmed)) {
+      return trimmed;
+    }
+
+    return "sans-serif";
+  }
+
+  function applyDocumentTypefaceClassState(typeface) {
+    const resolvedTypeface = resolveDocumentTypeface(typeface);
+    documentTypeface = resolvedTypeface;
+
+    const target = document.body;
+    if (!target) {
+      return;
+    }
+
+    supportedDocumentTypefaces.forEach((typefaceKey) => {
+      target.classList.remove(`${documentTypefaceBodyClassPrefix}${typefaceKey}`);
+    });
+
+    target.classList.add(`${documentTypefaceBodyClassPrefix}${resolvedTypeface}`);
+  }
+
+  function resolveDocumentDensity(value) {
+    if (typeof value !== "string") {
+      return "standard";
+    }
+
+    const trimmed = value.trim().toLowerCase();
+    if (supportedDocumentDensities.includes(trimmed)) {
+      return trimmed;
+    }
+
+    return "standard";
+  }
+
+  function applyDocumentDensityClassState(density) {
+    const resolvedDensity = resolveDocumentDensity(density);
+    documentDensity = resolvedDensity;
+
+    const target = document.body;
+    if (!target) {
+      return;
+    }
+
+    supportedDocumentDensities.forEach((densityKey) => {
+      target.classList.remove(`${documentDensityBodyClassPrefix}${densityKey}`);
+    });
+
+    target.classList.add(`${documentDensityBodyClassPrefix}${resolvedDensity}`);
   }
 
   // Applies highlight.js to all fenced code blocks inside one container.
@@ -103,6 +167,8 @@
     currentSource = typeof markdownSource === "string" ? markdownSource : "";
     syntaxHighlightingEnabled = !!options.syntaxHighlightingEnabled;
     applySyntaxThemeStyleState(options.syntaxHighlightingTheme);
+    applyDocumentTypefaceClassState(options.documentTypeface);
+    applyDocumentDensityClassState(options.documentDensity);
     renderCurrentSource(false);
   }
 
@@ -151,10 +217,32 @@
     }
   }
 
+  // Switches document typeface without re-rendering Markdown HTML.
+  function setDocumentTypeface(typeface) {
+    const nextTypeface = resolveDocumentTypeface(typeface);
+    if (documentTypeface === nextTypeface) {
+      return;
+    }
+
+    applyDocumentTypefaceClassState(nextTypeface);
+  }
+
+  // Switches document density without re-rendering Markdown HTML.
+  function setDocumentDensity(density) {
+    const nextDensity = resolveDocumentDensity(density);
+    if (documentDensity === nextDensity) {
+      return;
+    }
+
+    applyDocumentDensityClassState(nextDensity);
+  }
+
   // Expose a tiny, deterministic API used by the HTML bootstrap script.
   window.QuickMarkdownViewerRenderer = {
     renderFromSource,
     setSyntaxHighlightingEnabled,
-    setSyntaxTheme
+    setSyntaxTheme,
+    setDocumentTypeface,
+    setDocumentDensity
   };
 })();

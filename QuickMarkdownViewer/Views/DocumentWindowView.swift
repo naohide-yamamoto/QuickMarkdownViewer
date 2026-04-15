@@ -92,6 +92,16 @@ struct DocumentWindowView: View {
         AppPreferenceKey.syntaxHighlightingTheme
     ) private var syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
 
+    /// Selected document typeface for rendered typography.
+    @AppStorage(
+        AppPreferenceKey.documentTypeface
+    ) private var documentTypefaceRawValue = AppPreferenceDefault.documentTypeface
+
+    /// Selected document density variant.
+    @AppStorage(
+        AppPreferenceKey.documentDensity
+    ) private var documentDensityRawValue = AppPreferenceDefault.documentDensity
+
     /// Sanitised visibility value applied to web rendering.
     private var clampedWindowBackgroundVisibility: Double {
         max(0.0, min(1.0, windowBackgroundVisibility))
@@ -213,7 +223,9 @@ struct DocumentWindowView: View {
                     windowBackgroundColorLightHex: windowBackgroundColorLightHex,
                     windowBackgroundColorDarkHex: windowBackgroundColorDarkHex,
                     syntaxHighlightingEnabled: syntaxHighlightingEnabled,
-                    syntaxHighlightingThemeRawValue: syntaxHighlightingThemeRawValue
+                    syntaxHighlightingThemeRawValue: syntaxHighlightingThemeRawValue,
+                    documentTypefaceRawValue: documentTypefaceRawValue,
+                    documentDensityRawValue: documentDensityRawValue
                 )
             } else {
                 Text("Couldn’t open this Markdown file.")

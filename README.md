@@ -83,6 +83,9 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - One document per window.
 - Native customisable macOS toolbar with persisted layout/display mode.
 - Native Settings window (`⌘,`) with General and Appearance panes for preferences.
+- Built-in document text controls in Settings:
+  - Typeface: `Sans-serif` or `Serif`
+  - Density: `Standard` or `Compact`
 - File open from:
   - double-click in Finder (when associated)
   - `File > Open` (`⌘O`)

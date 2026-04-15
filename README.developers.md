@@ -46,6 +46,10 @@ Quick Markdown Viewer v1 is intentionally minimal:
 - Toolbar hide/show (`⌥⌘T`) and toolbar customisation (`View > Customise Toolbar…`)
 - Compact native Find panel when toolbar search is unavailable (for example, toolbar hidden)
 - Native Settings window with General/Appearance panes
+- Built-in document text controls in Settings:
+  - typeface (`Sans-serif`, `Serif`)
+  - density (`Standard`, `Compact`)
+  - local-only implementation (bundled CSS/font stack only; no external CSS/font loading)
 - Manual `Check for Updates…` plus optional automatic release-metadata checks
 
 ## Non-goals
@@ -222,15 +226,13 @@ and [README.developers.md](README.developers.md) are examples of behaviour that
 may work on a hosting platform without being a Quick Markdown Viewer
 compatibility target.
 
-Fenced-code syntax highlighting is optional and local-only: when enabled in
+Fenced-code syntax highlighting is optional: when enabled in
 Settings, the app applies bundled `highlight.js` after `markdown-it` renders
-document HTML. This setting is off by default. The default highlight theme is
+document HTML. The default highlight theme is
 GitHub (light/dark), with VS Code, Atom One, and Stack Overflow theme families
 also bundled for selection in Settings. For print and PDF export, syntax
 highlighting always resolves to the selected theme’s light variant so output
 remains print-friendly regardless of the active app appearance mode.
-Highlight enable/disable and theme switching are applied in place to existing
-code blocks, rather than by full-document rerender, to avoid page drift.
 
 ## Local Rendering and Security Model
 
@@ -238,6 +240,8 @@ Quick Markdown Viewer uses a local rendering pipeline. Markdown source is
 converted into an app-controlled HTML document using bundled `markdown-it`,
 bundled `highlight.js` (optional), bundled CSS, and bundled renderer
 JavaScript, then loaded into `WKWebView`.
+Document text controls (typeface and density) are also applied from bundled
+local CSS/font stacks only, without loading external CSS or fonts.
 The app does not use a remote Markdown rendering API or upload document
 contents for normal viewing.
 

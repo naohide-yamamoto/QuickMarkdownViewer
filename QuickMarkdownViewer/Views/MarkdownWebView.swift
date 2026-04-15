@@ -641,6 +641,7 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
         let contentHTML: String
         let stylesCSS: String
         let baseURL: URL?
+        let bodyClassName: String
     }
 
     /// Delegate used to detect completion of temporary web-view loading.
@@ -1204,11 +1205,15 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
             const baseURLString = baseElement
                 ? baseElement.href
                 : (document.baseURI || "");
+            const bodyClassName = document.body
+                ? (document.body.className || "")
+                : "";
 
             return {
                 contentHTML: content.outerHTML,
                 stylesCSS: printFriendlyStyles,
-                baseURLString
+                baseURLString,
+                bodyClassName
             };
         })();
         """
@@ -1228,13 +1233,15 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
             }
 
             let baseURL = (payload["baseURLString"] as? String).flatMap { URL(string: $0) }
+            let bodyClassName = (payload["bodyClassName"] as? String) ?? ""
             Logger.info("Captured temporary output snapshot: contentLength=\(contentHTML.count), stylesLength=\(stylesCSS.count).")
 
             completion(
                 TemporaryOutputSnapshot(
                     contentHTML: contentHTML,
                     stylesCSS: stylesCSS,
-                    baseURL: baseURL
+                    baseURL: baseURL,
+                    bodyClassName: bodyClassName
                 )
             )
         }
@@ -1247,6 +1254,15 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
     private func temporaryOutputHTML(from snapshot: TemporaryOutputSnapshot) -> String {
         let baseURLString = snapshot.baseURL?.absoluteString ?? ""
         let escapedBaseURL = SecurityHelpers.htmlAttributeLiteral(baseURLString)
+        let inheritedBodyClasses = snapshot.bodyClassName
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let outputBodyClass = inheritedBodyClasses.isEmpty
+            ? "qmv-print-output"
+            : "\(inheritedBodyClasses) qmv-print-output"
+        let escapedBodyClass = SecurityHelpers.htmlAttributeLiteral(outputBodyClass)
 
         return """
         <!doctype html>
@@ -1257,7 +1273,7 @@ final class MarkdownWebViewSearchBridge: ObservableObject {
             <base href="\(escapedBaseURL)">
             <style>\(snapshot.stylesCSS)</style>
           </head>
-          <body class="qmv-print-output">
+          <body class="\(escapedBodyClass)">
             \(snapshot.contentHTML)
           </body>
         </html>
@@ -1615,6 +1631,12 @@ struct MarkdownWebView: NSViewRepresentable {
     /// Selected syntax-highlight theme family raw value.
     let syntaxHighlightingThemeRawValue: String
 
+    /// Selected document typeface raw value.
+    let documentTypefaceRawValue: String
+
+    /// Selected document density raw value.
+    let documentDensityRawValue: String
+
     /// Creates coordinator used for navigation delegate callbacks.
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -1657,6 +1679,8 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.windowBackgroundColorDarkHex = windowBackgroundColorDarkHex
         context.coordinator.syntaxHighlightingEnabled = syntaxHighlightingEnabled
         context.coordinator.syntaxHighlightingThemeRawValue = syntaxHighlightingThemeRawValue
+        context.coordinator.documentTypefaceRawValue = documentTypefaceRawValue
+        context.coordinator.documentDensityRawValue = documentDensityRawValue
         context.coordinator.installMagnifyEventMonitorIfNeeded(on: webView)
         context.coordinator.installWebViewSizeObserverIfNeeded(on: webView)
         searchBridge.bind(webView: webView)
@@ -1680,6 +1704,8 @@ struct MarkdownWebView: NSViewRepresentable {
         context.coordinator.applyWindowBackgroundPreferencesIfNeeded(on: webView)
         context.coordinator.applySyntaxHighlightingPreferenceIfNeeded(on: webView)
         context.coordinator.applySyntaxHighlightingThemePreferenceIfNeeded(on: webView)
+        context.coordinator.applyDocumentTypefacePreferenceIfNeeded(on: webView)
+        context.coordinator.applyDocumentDensityPreferenceIfNeeded(on: webView)
     }
 
     /// Navigation delegate object used by the web view.
@@ -1711,6 +1737,12 @@ struct MarkdownWebView: NSViewRepresentable {
         /// Selected syntax-highlight theme family raw value.
         var syntaxHighlightingThemeRawValue: String = AppPreferenceDefault.syntaxHighlightingTheme
 
+        /// Selected document typeface raw value.
+        var documentTypefaceRawValue: String = AppPreferenceDefault.documentTypeface
+
+        /// Selected document density raw value.
+        var documentDensityRawValue: String = AppPreferenceDefault.documentDensity
+
         /// Fingerprint of last loaded HTML to avoid unnecessary reloads.
         var lastLoadedFingerprint = ""
 
@@ -1740,6 +1772,12 @@ struct MarkdownWebView: NSViewRepresentable {
 
         /// Last applied syntax-highlight theme key.
         private var lastAppliedSyntaxHighlightingThemeRawValue: String?
+
+        /// Last applied document typeface key.
+        private var lastAppliedDocumentTypefaceRawValue: String?
+
+        /// Last applied document density key.
+        private var lastAppliedDocumentDensityRawValue: String?
 
         /// Weak reference to the currently monitored web view instance.
         private weak var monitoredWebView: WKWebView?
@@ -1990,6 +2028,8 @@ struct MarkdownWebView: NSViewRepresentable {
             applyWindowBackgroundPreferencesIfNeeded(on: webView, force: true)
             applySyntaxHighlightingPreferenceIfNeeded(on: webView, force: true)
             applySyntaxHighlightingThemePreferenceIfNeeded(on: webView, force: true)
+            applyDocumentTypefacePreferenceIfNeeded(on: webView, force: true)
+            applyDocumentDensityPreferenceIfNeeded(on: webView, force: true)
 
             guard shouldApplyInitialZoomToFitOnNextDidFinish else {
                 return
@@ -2164,6 +2204,66 @@ struct MarkdownWebView: NSViewRepresentable {
             webView.evaluateJavaScript(script) { _, error in
                 if let error {
                     Logger.error("Failed to apply syntax theme setting: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// Applies document typeface preference without reloading the page.
+        func applyDocumentTypefacePreferenceIfNeeded(on webView: WKWebView, force: Bool = false) {
+            let resolvedTypeface = DocumentTypeface.resolved(
+                from: documentTypefaceRawValue
+            ).rawValue
+            let shouldApply = force || lastAppliedDocumentTypefaceRawValue != resolvedTypeface
+            guard shouldApply else {
+                return
+            }
+
+            lastAppliedDocumentTypefaceRawValue = resolvedTypeface
+            let typefaceLiteral = SecurityHelpers.jsonStringLiteral(resolvedTypeface)
+            let script = """
+            (() => {
+                const renderer = window.QuickMarkdownViewerRenderer;
+                if (!renderer || typeof renderer.setDocumentTypeface !== 'function') {
+                    return;
+                }
+
+                renderer.setDocumentTypeface(\(typefaceLiteral));
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    Logger.error("Failed to apply document typeface setting: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// Applies document density preference without reloading the page.
+        func applyDocumentDensityPreferenceIfNeeded(on webView: WKWebView, force: Bool = false) {
+            let resolvedDensity = DocumentDensity.resolved(
+                from: documentDensityRawValue
+            ).rawValue
+            let shouldApply = force || lastAppliedDocumentDensityRawValue != resolvedDensity
+            guard shouldApply else {
+                return
+            }
+
+            lastAppliedDocumentDensityRawValue = resolvedDensity
+            let densityLiteral = SecurityHelpers.jsonStringLiteral(resolvedDensity)
+            let script = """
+            (() => {
+                const renderer = window.QuickMarkdownViewerRenderer;
+                if (!renderer || typeof renderer.setDocumentDensity !== 'function') {
+                    return;
+                }
+
+                renderer.setDocumentDensity(\(densityLiteral));
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    Logger.error("Failed to apply document density setting: \(error.localizedDescription)")
                 }
             }
         }

@@ -32,6 +32,25 @@
   --qmv-background-custom-color-dark: #16181b;
   --qmv-background-custom-color: var(--qmv-background-custom-color-light);
   --qmv-content-max-width: 840px;
+  --qmv-content-padding-y: 32px;
+  --qmv-content-padding-x: clamp(20px, 3.5vw, 44px);
+
+  /* Typography defaults (Sans-serif). */
+  --qmv-font-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  --qmv-font-heading: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  --qmv-font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --qmv-body-font-size: 17px;
+  --qmv-body-line-height: 1.7;
+  --qmv-heading-weight: 650;
+  --qmv-link-light: #0d63d6;
+  --qmv-link-dark: #7bb4ff;
+
+  /* Density defaults (Standard). */
+  --qmv-density-font-scale: 1;
+  --qmv-density-line-height-scale: 1;
+  --qmv-density-spacing-scale: 1;
+  --qmv-density-prose-font-scale: 1;
+  --qmv-density-code-font-scale: 1;
 }
 
 * {
@@ -47,8 +66,28 @@ body {
 body {
   background: var(--qmv-background-custom-color);
   color: var(--text-light);
-  font: 17px/1.7 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+  font-family: var(--qmv-font-body);
+  font-size: calc(var(--qmv-body-font-size) * var(--qmv-density-font-scale));
+  line-height: calc(var(--qmv-body-line-height) * var(--qmv-density-line-height-scale));
   text-rendering: optimizeLegibility;
+}
+
+body.qmv-typeface-serif {
+  --qmv-font-body: "New York", "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
+  --qmv-font-heading: "New York", "Iowan Old Style", "Palatino Linotype", Palatino, "Times New Roman", serif;
+  --qmv-body-font-size: 17.5px;
+  --qmv-body-line-height: 1.74;
+  --qmv-heading-weight: 620;
+}
+
+body.qmv-density-compact {
+  --qmv-density-font-scale: 0.84;
+  --qmv-density-line-height-scale: 0.9;
+  --qmv-density-spacing-scale: 0.62;
+  --qmv-density-prose-font-scale: 0.92;
+  --qmv-density-code-font-scale: 1.3;
+  --qmv-content-padding-y: 22px;
+  --qmv-content-padding-x: clamp(14px, 2.6vw, 28px);
 }
 
 /* Main reading column */
@@ -64,7 +103,7 @@ body {
     calc(var(--qmv-background-scale) * 28px)
     auto
     calc(var(--qmv-background-scale) * 44px);
-  padding: 32px clamp(20px, 3.5vw, 44px);
+  padding: var(--qmv-content-padding-y) var(--qmv-content-padding-x);
   background: var(--card-bg-light);
   border: calc(var(--qmv-background-scale) * 1px) solid var(--rule-light);
   border-radius: calc(var(--qmv-background-scale) * 16px);
@@ -79,8 +118,12 @@ h4,
 h5,
 h6 {
   line-height: 1.25;
-  margin: 1.4em 0 0.55em;
-  font-weight: 650;
+  margin:
+    calc(1.4em * var(--qmv-density-spacing-scale))
+    0
+    calc(0.55em * var(--qmv-density-spacing-scale));
+  font-family: var(--qmv-font-heading);
+  font-weight: var(--qmv-heading-weight);
 }
 
 h1 {
@@ -101,7 +144,7 @@ li,
 blockquote,
 td,
 th {
-  font-size: 1rem;
+  font-size: calc(1rem * var(--qmv-density-prose-font-scale));
 }
 
 p,
@@ -111,12 +154,12 @@ pre,
 table,
 blockquote,
 hr {
-  margin: 1em 0;
+  margin: calc(1em * var(--qmv-density-spacing-scale)) 0;
 }
 
 /* Link treatment remains obvious but not editor-like */
 a {
-  color: #0d63d6;
+  color: var(--qmv-link-light);
   text-decoration-thickness: 0.08em;
   text-underline-offset: 0.13em;
 }
@@ -144,19 +187,21 @@ mark.quickmarkdownviewer-find-hit-active {
 /* Code presentation */
 code,
 pre {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-family: var(--qmv-font-mono);
 }
 
 code {
   background: var(--code-bg-light);
   padding: 0.14em 0.36em;
   border-radius: 6px;
-  font-size: 0.92em;
+  font-size: calc(0.92em * var(--qmv-density-font-scale) * var(--qmv-density-code-font-scale));
 }
 
 pre {
   background: var(--code-bg-light);
-  padding: 14px 16px;
+  padding:
+    calc(14px * var(--qmv-density-spacing-scale))
+    calc(16px * var(--qmv-density-spacing-scale));
   border-radius: 10px;
   overflow-x: auto;
   border: 1px solid var(--rule-light);
@@ -251,7 +296,7 @@ hr {
   }
 
   a {
-    color: #7bb4ff;
+    color: var(--qmv-link-dark);
   }
 
   mark.quickmarkdownviewer-find-hit {
