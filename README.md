@@ -178,6 +178,7 @@ You are responsible for reviewing, building, and using the software at your own 
 - File does not open: confirm the file extension is supported.
 - Image is missing: check that the image path is correct relative to the Markdown file location.
 - `.md` opens in another app: set Quick Markdown Viewer as default via Finder (**Open with > Change All…**).
+- Window is too large for your screen: open **Settings > Appearance** and reduce **Default window size** (width and height).
 
 ## What Quick Markdown Viewer Is Not For
 

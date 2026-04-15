@@ -4,6 +4,12 @@ import WebKit
 
 /// User-default keys backing app-level settings.
 enum AppPreferenceKey {
+    /// Default width (points) for newly opened windows.
+    static let defaultWindowWidth = "qmv.defaultWindowWidth"
+
+    /// Default height (points) for newly opened windows.
+    static let defaultWindowHeight = "qmv.defaultWindowHeight"
+
     /// Controls how much outer window background is visible.
     ///
     /// Range: `0.0 ... 1.0`
@@ -32,10 +38,19 @@ enum AppPreferenceKey {
     /// Selected document density variant.
     static let documentDensity = "qmv.documentDensity"
 
+    /// Selected toolbar button size.
+    static let toolbarButtonSize = "qmv.toolbarButtonSize"
+
 }
 
 /// Default values for app-level settings.
 enum AppPreferenceDefault {
+    /// Default width for newly opened windows.
+    static let defaultWindowWidth = 940
+
+    /// Default height for newly opened windows.
+    static let defaultWindowHeight = 760
+
     /// v1.0.6 default: about half the legacy v1.0.5 background framing.
     static let windowBackgroundVisibility = 0.5
 
@@ -59,6 +74,9 @@ enum AppPreferenceDefault {
 
     /// Default document density.
     static let documentDensity = DocumentDensity.standard.rawValue
+
+    /// Default toolbar button size.
+    static let toolbarButtonSize = ToolbarButtonSizePreference.small.rawValue
 }
 
 /// Available document typefaces for rendered Markdown typography.
@@ -108,6 +126,31 @@ enum DocumentDensity: String, CaseIterable, Identifiable {
             .lowercased()
 
         return DocumentDensity(rawValue: normalizedRawValue) ?? .standard
+    }
+}
+
+/// Available toolbar button-size preferences.
+enum ToolbarButtonSizePreference: String, CaseIterable, Identifiable {
+    case small
+    case standard
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .small:
+            return "Small"
+        case .standard:
+            return "Standard"
+        }
+    }
+
+    static func resolved(from rawValue: String) -> Self {
+        let normalizedRawValue = rawValue
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        return ToolbarButtonSizePreference(rawValue: normalizedRawValue) ?? .small
     }
 }
 
@@ -192,8 +235,22 @@ private struct QuickMarkdownViewerSettingsView: View {
         case appearance
     }
 
+    /// Focusable fields within the default window-size row.
+    private enum WindowSizeFieldFocus: Hashable {
+        case width
+        case height
+    }
+
     /// Shared app router used for update checks and appearance resets.
     @ObservedObject var routing: AppRouting
+
+    @AppStorage(
+        AppPreferenceKey.defaultWindowWidth
+    ) private var defaultWindowWidth = AppPreferenceDefault.defaultWindowWidth
+
+    @AppStorage(
+        AppPreferenceKey.defaultWindowHeight
+    ) private var defaultWindowHeight = AppPreferenceDefault.defaultWindowHeight
 
     @AppStorage(
         AppPreferenceKey.windowBackgroundVisibility
@@ -227,7 +284,12 @@ private struct QuickMarkdownViewerSettingsView: View {
         AppPreferenceKey.documentDensity
     ) private var documentDensityRawValue = AppPreferenceDefault.documentDensity
 
+    @AppStorage(
+        AppPreferenceKey.toolbarButtonSize
+    ) private var toolbarButtonSizeRawValue = AppPreferenceDefault.toolbarButtonSize
+
     @Environment(\.colorScheme) private var colorScheme
+    @FocusState private var focusedWindowSizeField: WindowSizeFieldFocus?
 
     /// Selected Settings tab.
     @State private var selectedTab: SettingsTab = .general
@@ -246,6 +308,15 @@ private struct QuickMarkdownViewerSettingsView: View {
 
     /// Selected appearance preference in General tab.
     @State private var selectedAppearancePreference: AppRouting.AppearancePreference = .system
+
+    /// Selected toolbar button size in General tab.
+    @State private var selectedToolbarButtonSizePreference: ToolbarButtonSizePreference = .small
+
+    /// Editable text backing for default window width input.
+    @State private var defaultWindowWidthInput = ""
+
+    /// Editable text backing for default window height input.
+    @State private var defaultWindowHeightInput = ""
 
     /// True while General-tab picker state is being synchronised from router.
     @State private var isRefreshingGeneralTabState = false
@@ -275,6 +346,9 @@ private struct QuickMarkdownViewerSettingsView: View {
     ///
     /// Sized to fit "Quick Markdown Viewer" in full while remaining compact.
     private let generalAppPickerWidth: CGFloat = 210
+
+    private let defaultWindowWidthRange = 640...1800
+    private let defaultWindowHeightRange = 420...1400
 
     private let appearanceRowLabelWidth: CGFloat = 160
 
@@ -513,6 +587,60 @@ private struct QuickMarkdownViewerSettingsView: View {
                     }
                     .padding(.vertical, 2)
 
+                    appearancePaneRow("Default window size:", alignment: .center) {
+                        HStack(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Text("Width:")
+                                    .foregroundStyle(.secondary)
+                                TextField("", text: $defaultWindowWidthInput)
+                                    .frame(width: 52)
+                                    .multilineTextAlignment(.trailing)
+                                    .focused($focusedWindowSizeField, equals: .width)
+                                    .onSubmit {
+                                        commitDefaultWindowWidthInput()
+                                    }
+                                Text("pt")
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Color.clear
+                                .frame(width: 12, height: 1)
+
+                            HStack(spacing: 8) {
+                                Text("Height:")
+                                    .foregroundStyle(.secondary)
+                                TextField("", text: $defaultWindowHeightInput)
+                                    .frame(width: 52)
+                                    .multilineTextAlignment(.trailing)
+                                    .focused($focusedWindowSizeField, equals: .height)
+                                    .onSubmit {
+                                        commitDefaultWindowHeightInput()
+                                    }
+                                Text("pt")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
+
+                    appearancePaneRow("") {
+                        Text("Width range: \(defaultWindowWidthRange.lowerBound)-\(defaultWindowWidthRange.upperBound) pt · Height range: \(defaultWindowHeightRange.lowerBound)-\(defaultWindowHeightRange.upperBound) pt")
+                            .foregroundStyle(.secondary)
+                            .font(.footnote)
+                    }
+                    .padding(.top, 2)
+                    .padding(.bottom, 4)
+
+                    appearancePaneRow("Toolbar button size:", alignment: .center) {
+                        Picker("", selection: $selectedToolbarButtonSizePreference) {
+                            ForEach(ToolbarButtonSizePreference.allCases) { option in
+                                Text(option.displayName).tag(option)
+                            }
+                        }
+                        .labelsHidden()
+                    }
+                    .padding(.vertical, 4)
+
                     appearancePaneRow("Document style:", alignment: .center) {
                         HStack(spacing: 16) {
                             HStack(spacing: 2) {
@@ -563,13 +691,15 @@ private struct QuickMarkdownViewerSettingsView: View {
                     .padding(.vertical, 4)
 
                     appearancePaneRow("") {
-                        SyntaxHighlightPreviewPanel(
-                            theme: selectedSyntaxHighlightTheme,
-                            typeface: selectedDocumentTypeface,
-                            density: selectedDocumentDensity,
-                            isHighlightingEnabled: syntaxHighlightingEnabled,
-                            isDarkMode: colorScheme == .dark
-                        )
+                        if selectedTab == .appearance {
+                            SyntaxHighlightPreviewPanel(
+                                theme: selectedSyntaxHighlightTheme,
+                                typeface: selectedDocumentTypeface,
+                                density: selectedDocumentDensity,
+                                isHighlightingEnabled: syntaxHighlightingEnabled,
+                                isDarkMode: colorScheme == .dark
+                            )
+                        }
                     }
                     .padding(.vertical, 2)
 
@@ -603,6 +733,7 @@ private struct QuickMarkdownViewerSettingsView: View {
         .frame(minWidth: 560, idealWidth: 620, minHeight: 420)
         .onAppear {
             refreshGeneralTabState()
+            syncWindowSizeInputFieldsFromStoredValues()
         }
         .onChange(of: selectedMarkdownViewerBundleID) { newBundleID in
             if suppressNextMarkdownViewerSelectionChange {
@@ -663,11 +794,41 @@ private struct QuickMarkdownViewerSettingsView: View {
 
             routing.setAppearancePreferenceForSettings(newPreference)
         }
+        .onChange(of: selectedToolbarButtonSizePreference) { newPreference in
+            guard !isRefreshingGeneralTabState else {
+                return
+            }
+
+            toolbarButtonSizeRawValue = newPreference.rawValue
+            routing.setToolbarButtonSizePreferenceForSettings(newPreference)
+        }
         .onChange(of: routing.appearancePreferenceRevision) { _ in
             guard !isRefreshingGeneralTabState else {
                 return
             }
             selectedAppearancePreference = routing.appearancePreferenceForSettings()
+        }
+        .onChange(of: routing.toolbarButtonSizePreferenceRevision) { _ in
+            guard !isRefreshingGeneralTabState else {
+                return
+            }
+            selectedToolbarButtonSizePreference = routing.toolbarButtonSizePreferenceForSettings()
+            toolbarButtonSizeRawValue = selectedToolbarButtonSizePreference.rawValue
+        }
+        .onChange(of: focusedWindowSizeField) { newFocus in
+            if newFocus != .width {
+                commitDefaultWindowWidthInput()
+            }
+
+            if newFocus != .height {
+                commitDefaultWindowHeightInput()
+            }
+        }
+        .onChange(of: defaultWindowWidth) { _ in
+            syncWindowSizeInputFieldsFromStoredValues()
+        }
+        .onChange(of: defaultWindowHeight) { _ in
+            syncWindowSizeInputFieldsFromStoredValues()
         }
         .alert("Reset General settings?", isPresented: $isShowingGeneralResetConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -719,6 +880,15 @@ private struct QuickMarkdownViewerSettingsView: View {
         syntaxHighlightingThemeRawValue = AppPreferenceDefault.syntaxHighlightingTheme
         documentTypefaceRawValue = AppPreferenceDefault.documentTypeface
         documentDensityRawValue = AppPreferenceDefault.documentDensity
+        defaultWindowWidth = AppPreferenceDefault.defaultWindowWidth
+        defaultWindowHeight = AppPreferenceDefault.defaultWindowHeight
+        focusedWindowSizeField = nil
+        syncWindowSizeInputFieldsFromStoredValues(force: true)
+        toolbarButtonSizeRawValue = AppPreferenceDefault.toolbarButtonSize
+        selectedToolbarButtonSizePreference = ToolbarButtonSizePreference.resolved(
+            from: AppPreferenceDefault.toolbarButtonSize
+        )
+        routing.setToolbarButtonSizePreferenceForSettings(selectedToolbarButtonSizePreference)
     }
 
     /// Refreshes General-tab controls from current system/app state.
@@ -760,6 +930,8 @@ private struct QuickMarkdownViewerSettingsView: View {
         }
 
         selectedAppearancePreference = routing.appearancePreferenceForSettings()
+        selectedToolbarButtonSizePreference = routing.toolbarButtonSizePreferenceForSettings()
+        toolbarButtonSizeRawValue = selectedToolbarButtonSizePreference.rawValue
     }
 
     /// Applies a new default-viewer selection and synchronises picker state after
@@ -814,6 +986,43 @@ private struct QuickMarkdownViewerSettingsView: View {
 
         suppressNextViewSourceAppSelectionChange = true
         selectedViewSourceAppID = selectionID
+    }
+
+    /// Commits and clamps one width entry from the editable text field.
+    private func commitDefaultWindowWidthInput() {
+        let trimmed = defaultWindowWidthInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let parsedValue = Int(trimmed) else {
+            defaultWindowWidthInput = "\(defaultWindowWidth)"
+            return
+        }
+
+        let clampedValue = min(max(parsedValue, defaultWindowWidthRange.lowerBound), defaultWindowWidthRange.upperBound)
+        defaultWindowWidth = clampedValue
+        defaultWindowWidthInput = "\(clampedValue)"
+    }
+
+    /// Commits and clamps one height entry from the editable text field.
+    private func commitDefaultWindowHeightInput() {
+        let trimmed = defaultWindowHeightInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let parsedValue = Int(trimmed) else {
+            defaultWindowHeightInput = "\(defaultWindowHeight)"
+            return
+        }
+
+        let clampedValue = min(max(parsedValue, defaultWindowHeightRange.lowerBound), defaultWindowHeightRange.upperBound)
+        defaultWindowHeight = clampedValue
+        defaultWindowHeightInput = "\(clampedValue)"
+    }
+
+    /// Keeps editable width/height text in sync with persisted values.
+    private func syncWindowSizeInputFieldsFromStoredValues(force: Bool = false) {
+        if force || focusedWindowSizeField != .width {
+            defaultWindowWidthInput = "\(defaultWindowWidth)"
+        }
+
+        if force || focusedWindowSizeField != .height {
+            defaultWindowHeightInput = "\(defaultWindowHeight)"
+        }
     }
 
     /// Shared row layout used by Appearance pane for fixed right-aligned labels.
@@ -967,44 +1176,63 @@ private struct SyntaxHighlightPreviewPanel: View {
     let density: DocumentDensity
     let isHighlightingEnabled: Bool
     let isDarkMode: Bool
-    @State private var measuredHeight: CGFloat = 66
+    private let previewHeight: CGFloat = 66
+    private let previewWidth: CGFloat = 273
+    private let previewCornerRadius: CGFloat = 10
+
+    private var previewBackgroundColor: Color {
+        if isDarkMode {
+            return Color(red: 0x25 / 255.0, green: 0x2B / 255.0, blue: 0x32 / 255.0)
+        }
+        return Color(red: 0xF2 / 255.0, green: 0xF5 / 255.0, blue: 0xF8 / 255.0)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            SyntaxHighlightPreviewWebView(
-                theme: theme,
-                typeface: typeface,
-                density: density,
-                isHighlightingEnabled: isHighlightingEnabled,
-                isDarkMode: isDarkMode
-            ) { newHeight in
-                let clampedHeight = min(max(newHeight, 56), 140)
-                guard abs(clampedHeight - measuredHeight) > 0.5 else {
-                    return
+            if isHighlightingEnabled {
+                SyntaxHighlightPreviewWebView(
+                    configuration: SyntaxHighlightPreviewConfiguration(
+                        theme: theme,
+                        typeface: typeface,
+                        density: density,
+                        isHighlightingEnabled: isHighlightingEnabled,
+                        isDarkMode: isDarkMode
+                    )
+                )
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: previewCornerRadius, style: .continuous)
+                        .fill(previewBackgroundColor)
+                    Text("Theme preview")
+                        .foregroundStyle(.secondary)
+                        .font(.footnote)
                 }
-                measuredHeight = clampedHeight
             }
-            .frame(width: 420, height: measuredHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
-            )
         }
+        .frame(width: previewWidth, height: previewHeight)
+        .clipShape(RoundedRectangle(cornerRadius: previewCornerRadius, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: previewCornerRadius, style: .continuous)
+                .stroke(Color(nsColor: .separatorColor).opacity(0.45), lineWidth: 1)
+        )
     }
 }
 
-/// Native web preview so settings reflect the exact bundled highlight theme CSS.
-private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
+/// Equatable configuration for settings preview rendering.
+private struct SyntaxHighlightPreviewConfiguration: Equatable {
     let theme: SyntaxHighlightTheme
     let typeface: DocumentTypeface
     let density: DocumentDensity
     let isHighlightingEnabled: Bool
     let isDarkMode: Bool
-    let onMeasuredHeight: (CGFloat) -> Void
+}
+
+/// Native web preview so settings reflect the exact bundled highlight theme CSS.
+private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
+    let configuration: SyntaxHighlightPreviewConfiguration
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(onMeasuredHeight: onMeasuredHeight)
+        Coordinator()
     }
 
     func makeNSView(context: Context) -> WKWebView {
@@ -1017,50 +1245,36 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
         webView.allowsMagnification = false
         webView.allowsBackForwardNavigationGestures = false
         webView.setAccessibilityElement(false)
-        webView.navigationDelegate = context.coordinator
         return webView
     }
 
     func updateNSView(_ webView: WKWebView, context: Context) {
-        let html = makeHTML(
-            theme: theme,
-            typeface: typeface,
-            density: density,
-            isHighlightingEnabled: isHighlightingEnabled,
-            isDarkMode: isDarkMode
-        )
-
-        guard context.coordinator.lastHTML != html else {
+        guard context.coordinator.lastConfiguration != configuration else {
             return
         }
 
-        context.coordinator.lastHTML = html
+        context.coordinator.lastConfiguration = configuration
+        let html = makeHTML(configuration: configuration)
         webView.loadHTMLString(html, baseURL: nil)
     }
 
-    private func makeHTML(
-        theme: SyntaxHighlightTheme,
-        typeface: DocumentTypeface,
-        density: DocumentDensity,
-        isHighlightingEnabled: Bool,
-        isDarkMode: Bool
-    ) -> String {
-        let themeCSS = loadThemeCSS(theme: theme, isDarkMode: isDarkMode)
-        let highlightJavaScript = isHighlightingEnabled ? loadHighlightJavaScript() : ""
-        let textColor = isDarkMode ? "#E8EDF2" : "#1F2933"
-        let codeBackground = isDarkMode ? "#252B32" : "#F2F5F8"
-        let codeBorder = isDarkMode ? "#36404A" : "#DDE3EA"
-        let bodyBackground = isDarkMode ? "#1F2328" : "#FFFFFF"
+    private func makeHTML(configuration: SyntaxHighlightPreviewConfiguration) -> String {
+        let themeCSS = loadThemeCSS(theme: configuration.theme, isDarkMode: configuration.isDarkMode)
+        let highlightJavaScript = configuration.isHighlightingEnabled ? loadHighlightJavaScript() : ""
+        let textColor = configuration.isDarkMode ? "#E8EDF2" : "#1F2933"
+        let codeBackground = configuration.isDarkMode ? "#252B32" : "#F2F5F8"
+        let codeBorder = configuration.isDarkMode ? "#36404A" : "#DDE3EA"
+        let bodyBackground = codeBackground
         let snippetSource = [
             "import Foundation",
             "let message = \"Hello, Markdown!\"",
             "print(message)"
         ].joined(separator: "\n")
         let escapedSnippet = escapeHTML(snippetSource)
-        let codeClass = isHighlightingEnabled ? "hljs language-swift" : ""
-        let previewTypefaceClass = "qmv-typeface-\(typeface.rawValue)"
-        let previewDensityClass = "qmv-density-\(density.rawValue)"
-        let highlightBootstrapScript = isHighlightingEnabled ? """
+        let codeClass = configuration.isHighlightingEnabled ? "hljs language-swift" : ""
+        let previewTypefaceClass = "qmv-typeface-\(configuration.typeface.rawValue)"
+        let previewDensityClass = "qmv-density-\(configuration.density.rawValue)"
+        let highlightBootstrapScript = configuration.isHighlightingEnabled ? """
             <script>
               \(highlightJavaScript)
             </script>
@@ -1084,6 +1298,7 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
               html, body {
                 margin: 0;
                 padding: 0;
+                height: 100%;
                 background: \(bodyBackground);
                 overflow: hidden;
               }
@@ -1094,6 +1309,8 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
               .preview {
                 margin: 0;
                 padding: 8px 10px 5px 10px;
+                height: 100%;
+                box-sizing: border-box;
                 background: \(codeBackground);
                 border: 1px solid \(codeBorder);
                 border-radius: 10px;
@@ -1128,6 +1345,43 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
         """
     }
 
+    private static let themeResourceNames: [String] = [
+        "highlight-github-dark.min",
+        "highlight-github.min",
+        "highlight-vs2015.min",
+        "highlight-vs.min",
+        "highlight-atom-one-dark.min",
+        "highlight-atom-one-light.min",
+        "highlight-stackoverflow-dark.min",
+        "highlight-stackoverflow-light.min"
+    ]
+
+    private static let cachedThemeCSSByResourceName: [String: String] = {
+        Dictionary(
+            uniqueKeysWithValues: themeResourceNames.map { resourceName in
+                (resourceName, loadBundledResource(named: resourceName, ext: "css"))
+            }
+        )
+    }()
+
+    private static let cachedHighlightJavaScript: String = {
+        loadBundledResource(named: "highlight.min", ext: "js")
+    }()
+
+    private static func loadBundledResource(named name: String, ext: String) -> String {
+        let url = Bundle.main.url(
+            forResource: name,
+            withExtension: ext,
+            subdirectory: "Web"
+        ) ?? Bundle.main.url(forResource: name, withExtension: ext)
+
+        guard let url else {
+            return ""
+        }
+
+        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+    }
+
     private func loadThemeCSS(theme: SyntaxHighlightTheme, isDarkMode: Bool) -> String {
         let resourceName: String
 
@@ -1150,31 +1404,11 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
             resourceName = "highlight-stackoverflow-light.min"
         }
 
-        let url = Bundle.main.url(
-            forResource: resourceName,
-            withExtension: "css",
-            subdirectory: "Web"
-        ) ?? Bundle.main.url(forResource: resourceName, withExtension: "css")
-
-        guard let url else {
-            return ""
-        }
-
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        return Self.cachedThemeCSSByResourceName[resourceName] ?? ""
     }
 
     private func loadHighlightJavaScript() -> String {
-        let url = Bundle.main.url(
-            forResource: "highlight.min",
-            withExtension: "js",
-            subdirectory: "Web"
-        ) ?? Bundle.main.url(forResource: "highlight.min", withExtension: "js")
-
-        guard let url else {
-            return ""
-        }
-
-        return (try? String(contentsOf: url, encoding: .utf8)) ?? ""
+        Self.cachedHighlightJavaScript
     }
 
     private func escapeHTML(_ value: String) -> String {
@@ -1184,30 +1418,7 @@ private struct SyntaxHighlightPreviewWebView: NSViewRepresentable {
             .replacingOccurrences(of: ">", with: "&gt;")
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
-        var lastHTML = ""
-        private let onMeasuredHeight: (CGFloat) -> Void
-
-        init(onMeasuredHeight: @escaping (CGFloat) -> Void) {
-            self.onMeasuredHeight = onMeasuredHeight
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            let script = """
-            (function () {
-              const preview = document.querySelector('pre.preview');
-              if (!preview) { return 66; }
-              return Math.ceil(preview.getBoundingClientRect().height);
-            })();
-            """
-
-            webView.evaluateJavaScript(script) { result, _ in
-                guard let rawValue = result as? NSNumber else {
-                    return
-                }
-                let height = CGFloat(truncating: rawValue)
-                self.onMeasuredHeight(height + 1)
-            }
-        }
+    final class Coordinator: NSObject {
+        var lastConfiguration: SyntaxHighlightPreviewConfiguration?
     }
 }

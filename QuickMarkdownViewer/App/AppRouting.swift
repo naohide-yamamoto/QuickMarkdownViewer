@@ -658,12 +658,42 @@ final class AppRouting: ObservableObject {
     /// Tiny published token used to refresh appearance controls in Settings.
     @Published private(set) var appearancePreferenceRevision: UInt = 0
 
+    /// Tiny published token used to refresh toolbar-size controls in Settings.
+    @Published private(set) var toolbarButtonSizePreferenceRevision: UInt = 0
+
     /// Most recent document window used for menu-state fallback routing.
     private weak var lastRoutedDocumentWindow: NSWindow?
 
     /// Private init enforces the shared-router model.
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+    }
+
+    /// Returns the toolbar button-size preference used in Settings.
+    func toolbarButtonSizePreferenceForSettings() -> ToolbarButtonSizePreference {
+        let rawValue = defaults.string(forKey: AppPreferenceKey.toolbarButtonSize)
+            ?? AppPreferenceDefault.toolbarButtonSize
+        return ToolbarButtonSizePreference.resolved(from: rawValue)
+    }
+
+    /// Applies toolbar button-size preference selected in Settings.
+    func setToolbarButtonSizePreferenceForSettings(_ preference: ToolbarButtonSizePreference) {
+        defaults.set(preference.rawValue, forKey: AppPreferenceKey.toolbarButtonSize)
+        applyToolbarButtonSizePreferenceToOpenWindows(preference)
+        notifyToolbarButtonSizePreferenceChanged()
+    }
+
+    /// Syncs Settings state when AppKit changes toolbar size mode natively.
+    func syncToolbarButtonSizePreferenceFromToolbarSizeMode(_ sizeMode: NSToolbar.SizeMode) {
+        let resolvedPreference = ToolbarButtonSizePreference.resolved(from: sizeMode)
+        let currentPreference = toolbarButtonSizePreferenceForSettings()
+
+        guard resolvedPreference != currentPreference else {
+            return
+        }
+
+        defaults.set(resolvedPreference.rawValue, forKey: AppPreferenceKey.toolbarButtonSize)
+        notifyToolbarButtonSizePreferenceChanged()
     }
 
     /// Presents the standard file chooser for Markdown documents.
@@ -1374,7 +1404,8 @@ final class AppRouting: ObservableObject {
 
         let hostingController = NSHostingController(rootView: rootView)
 
-        let initialFrame = NSRect(x: 0, y: 0, width: 940, height: 760)
+        let defaultWindowSize = defaultWindowSizeForNewWindows()
+        let initialFrame = NSRect(x: 0, y: 0, width: defaultWindowSize.width, height: defaultWindowSize.height)
         let window = NSWindow(
             contentRect: initialFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -1639,7 +1670,8 @@ final class AppRouting: ObservableObject {
         let hostingController = NSHostingController(rootView: rootView)
 
         // Keep window chrome minimal while preserving native controls.
-        let initialFrame = NSRect(x: 0, y: 0, width: 940, height: 760)
+        let defaultWindowSize = defaultWindowSizeForNewWindows()
+        let initialFrame = NSRect(x: 0, y: 0, width: defaultWindowSize.width, height: defaultWindowSize.height)
         let window = NSWindow(
             contentRect: initialFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -2617,6 +2649,51 @@ final class AppRouting: ObservableObject {
     private func notifyAppearancePreferenceChanged() {
         appearancePreferenceRevision &+= 1
     }
+
+    /// Bumps toolbar-size settings refresh token.
+    private func notifyToolbarButtonSizePreferenceChanged() {
+        toolbarButtonSizePreferenceRevision &+= 1
+    }
+
+    /// Applies one toolbar size preference to all currently open windows.
+    private func applyToolbarButtonSizePreferenceToOpenWindows(_ preference: ToolbarButtonSizePreference) {
+        for controller in windowControllers.values {
+            controller.window?.toolbar?.sizeMode = preference.toolbarSizeMode
+        }
+    }
+
+    /// Returns one clamped default size for newly created windows.
+    private func defaultWindowSizeForNewWindows() -> NSSize {
+        let width = resolvedDefaultWindowDimension(
+            key: AppPreferenceKey.defaultWindowWidth,
+            fallback: AppPreferenceDefault.defaultWindowWidth,
+            range: 640...1800
+        )
+        let height = resolvedDefaultWindowDimension(
+            key: AppPreferenceKey.defaultWindowHeight,
+            fallback: AppPreferenceDefault.defaultWindowHeight,
+            range: 420...1400
+        )
+
+        return NSSize(width: width, height: height)
+    }
+
+    /// Resolves one persisted window dimension and clamps to a safe range.
+    private func resolvedDefaultWindowDimension(
+        key: String,
+        fallback: Int,
+        range: ClosedRange<Int>
+    ) -> CGFloat {
+        let rawValue: Int
+        if let storedNumber = defaults.object(forKey: key) as? NSNumber {
+            rawValue = storedNumber.intValue
+        } else {
+            rawValue = fallback
+        }
+
+        let clampedValue = min(max(rawValue, range.lowerBound), range.upperBound)
+        return CGFloat(clampedValue)
+    }
 }
 
 /// Small controller used to cleanly drop retained window references on close.
@@ -2625,12 +2702,24 @@ private final class DocumentWindowToolbar: NSToolbar {
     /// Callback fired whenever display mode changes.
     var onDisplayModeChanged: ((NSToolbar) -> Void)?
 
+    /// Callback fired whenever size mode changes.
+    var onSizeModeChanged: ((NSToolbar) -> Void)?
+
     override var displayMode: NSToolbar.DisplayMode {
         didSet {
             guard oldValue != displayMode else {
                 return
             }
             onDisplayModeChanged?(self)
+        }
+    }
+
+    override var sizeMode: NSToolbar.SizeMode {
+        didSet {
+            guard oldValue != sizeMode else {
+                return
+            }
+            onSizeModeChanged?(self)
         }
     }
 }
@@ -2933,7 +3022,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             toolbar.allowsDisplayModeCustomization = true
         }
         toolbar.autosavesConfiguration = true
-        toolbar.sizeMode = .small
+        toolbar.sizeMode = AppRouting.shared.toolbarButtonSizePreferenceForSettings().toolbarSizeMode
         toolbar.showsBaselineSeparator = true
 
         if !hasSavedToolbarConfiguration() {
@@ -2969,6 +3058,10 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             // Prevent redundant duplicated Find UI after toolbar mode switches.
             self.closeFloatingFindPanel()
             self.rebuildSearchToolbarItemIfNeeded(in: toolbar)
+        }
+
+        toolbar.onSizeModeChanged = { toolbar in
+            AppRouting.shared.syncToolbarButtonSizePreferenceFromToolbarSizeMode(toolbar.sizeMode)
         }
     }
 
@@ -4026,5 +4119,27 @@ extension DocumentWindowController: NSSharingServicePickerToolbarItemDelegate {
         }
 
         return [fileURL]
+    }
+}
+
+private extension ToolbarButtonSizePreference {
+    var toolbarSizeMode: NSToolbar.SizeMode {
+        switch self {
+        case .small:
+            return .small
+        case .standard:
+            return .regular
+        }
+    }
+
+    static func resolved(from sizeMode: NSToolbar.SizeMode) -> ToolbarButtonSizePreference {
+        switch sizeMode {
+        case .small:
+            return .small
+        case .regular, .default:
+            return .standard
+        @unknown default:
+            return .small
+        }
     }
 }
