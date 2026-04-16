@@ -347,9 +347,6 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Sized to fit "Quick Markdown Viewer" in full while remaining compact.
     private let generalAppPickerWidth: CGFloat = 210
 
-    private let defaultWindowWidthRange = 640...1800
-    private let defaultWindowHeightRange = 420...1400
-
     private let appearanceRowLabelWidth: CGFloat = 160
 
     private var selectedSyntaxHighlightTheme: SyntaxHighlightTheme {
@@ -366,6 +363,18 @@ private struct QuickMarkdownViewerSettingsView: View {
 
     private var windowBackgroundVisibilityPercentage: Int {
         Int(round(windowBackgroundVisibility * 100))
+    }
+
+    private var defaultWindowSizeBounds: AppRouting.WindowSizeBounds {
+        routing.defaultWindowSizeBoundsForSettings()
+    }
+
+    private var defaultWindowWidthRange: ClosedRange<Int> {
+        defaultWindowSizeBounds.widthRange
+    }
+
+    private var defaultWindowHeightRange: ClosedRange<Int> {
+        defaultWindowSizeBounds.heightRange
     }
 
     /// Popup options used by the default Markdown-viewer control.
@@ -624,7 +633,7 @@ private struct QuickMarkdownViewerSettingsView: View {
                     .padding(.vertical, 4)
 
                     appearancePaneRow("") {
-                        Text("Width range: \(defaultWindowWidthRange.lowerBound)-\(defaultWindowWidthRange.upperBound) pt · Height range: \(defaultWindowHeightRange.lowerBound)-\(defaultWindowHeightRange.upperBound) pt")
+                        Text("Width range: \(defaultWindowWidthRange.lowerBound)–\(defaultWindowWidthRange.upperBound) pt · Height range: \(defaultWindowHeightRange.lowerBound)–\(defaultWindowHeightRange.upperBound) pt")
                             .foregroundStyle(.secondary)
                             .font(.footnote)
                     }
@@ -733,6 +742,7 @@ private struct QuickMarkdownViewerSettingsView: View {
         .frame(minWidth: 560, idealWidth: 620, minHeight: 420)
         .onAppear {
             refreshGeneralTabState()
+            clampStoredDefaultWindowSizeToCurrentBounds()
             syncWindowSizeInputFieldsFromStoredValues()
         }
         .onChange(of: selectedMarkdownViewerBundleID) { newBundleID in
@@ -815,6 +825,10 @@ private struct QuickMarkdownViewerSettingsView: View {
             selectedToolbarButtonSizePreference = routing.toolbarButtonSizePreferenceForSettings()
             toolbarButtonSizeRawValue = selectedToolbarButtonSizePreference.rawValue
         }
+        .onChange(of: routing.windowSizeBoundsRevision) { _ in
+            clampStoredDefaultWindowSizeToCurrentBounds()
+            syncWindowSizeInputFieldsFromStoredValues(force: true)
+        }
         .onChange(of: focusedWindowSizeField) { newFocus in
             if newFocus != .width {
                 commitDefaultWindowWidthInput()
@@ -882,6 +896,7 @@ private struct QuickMarkdownViewerSettingsView: View {
         documentDensityRawValue = AppPreferenceDefault.documentDensity
         defaultWindowWidth = AppPreferenceDefault.defaultWindowWidth
         defaultWindowHeight = AppPreferenceDefault.defaultWindowHeight
+        clampStoredDefaultWindowSizeToCurrentBounds()
         focusedWindowSizeField = nil
         syncWindowSizeInputFieldsFromStoredValues(force: true)
         toolbarButtonSizeRawValue = AppPreferenceDefault.toolbarButtonSize
@@ -1012,6 +1027,25 @@ private struct QuickMarkdownViewerSettingsView: View {
         let clampedValue = min(max(parsedValue, defaultWindowHeightRange.lowerBound), defaultWindowHeightRange.upperBound)
         defaultWindowHeight = clampedValue
         defaultWindowHeightInput = "\(clampedValue)"
+    }
+
+    /// Clamps persisted default window size to the current dynamic bounds.
+    private func clampStoredDefaultWindowSizeToCurrentBounds() {
+        let clampedWidth = min(
+            max(defaultWindowWidth, defaultWindowWidthRange.lowerBound),
+            defaultWindowWidthRange.upperBound
+        )
+        if clampedWidth != defaultWindowWidth {
+            defaultWindowWidth = clampedWidth
+        }
+
+        let clampedHeight = min(
+            max(defaultWindowHeight, defaultWindowHeightRange.lowerBound),
+            defaultWindowHeightRange.upperBound
+        )
+        if clampedHeight != defaultWindowHeight {
+            defaultWindowHeight = clampedHeight
+        }
     }
 
     /// Keeps editable width/height text in sync with persisted values.

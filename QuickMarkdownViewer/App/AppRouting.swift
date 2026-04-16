@@ -509,6 +509,22 @@ final class AppRouting: ObservableObject {
         }
     }
 
+    /// Dynamic bounds used for default window-size settings.
+    struct WindowSizeBounds: Equatable {
+        let minWidth: Int
+        let maxWidth: Int
+        let minHeight: Int
+        let maxHeight: Int
+
+        var widthRange: ClosedRange<Int> {
+            minWidth...maxWidth
+        }
+
+        var heightRange: ClosedRange<Int> {
+            minHeight...maxHeight
+        }
+    }
+
     /// Shared router instance used by SwiftUI commands and AppKit delegate flow.
     static let shared = AppRouting()
 
@@ -625,8 +641,44 @@ final class AppRouting: ObservableObject {
     /// Defaults store used for tiny viewer preferences.
     private let defaults: UserDefaults
 
+    /// Baseline minimum width shown in Settings for new default-window sizes.
+    private let defaultWindowBaselineMinWidth = 745
+
+    /// Baseline minimum height shown in Settings for new default-window sizes.
+    private let defaultWindowBaselineMinHeight = 420
+
+    /// Absolute safety-floor width used when displays are unusually small.
+    private let defaultWindowAbsoluteMinWidth = 480
+
+    /// Absolute safety-floor height used when displays are unusually small.
+    private let defaultWindowAbsoluteMinHeight = 320
+
+    /// Fallback max width when no display metrics are available.
+    private let defaultWindowFallbackMaxWidth = 1800
+
+    /// Fallback max height when no display metrics are available.
+    private let defaultWindowFallbackMaxHeight = 1400
+
     /// True while one update check task is currently in flight.
     private var isCheckingForUpdates = false
+
+    /// Cached dynamic bounds used by window-size settings and open-window clamp.
+    private var cachedWindowSizeBounds = WindowSizeBounds(
+        minWidth: 741,
+        maxWidth: 1800,
+        minHeight: 420,
+        maxHeight: 1400
+    )
+
+    /// Snapshot of currently connected display IDs used for bounds stability.
+    ///
+    /// We only allow max window-size bounds to shrink when the connected-screen
+    /// set actually changes (for example, monitor disconnect). This avoids
+    /// transient range drops caused by display-role transitions.
+    private var cachedWindowSizeScreenIDs: Set<NSNumber> = []
+
+    /// Observer token for display-configuration changes.
+    private var screenParametersObserver: NSObjectProtocol?
 
     /// Strong references for open windows.
     ///
@@ -661,12 +713,36 @@ final class AppRouting: ObservableObject {
     /// Tiny published token used to refresh toolbar-size controls in Settings.
     @Published private(set) var toolbarButtonSizePreferenceRevision: UInt = 0
 
+    /// Tiny published token used to refresh dynamic window-size bounds in Settings.
+    @Published private(set) var windowSizeBoundsRevision: UInt = 0
+
     /// Most recent document window used for menu-state fallback routing.
     private weak var lastRoutedDocumentWindow: NSWindow?
 
     /// Private init enforces the shared-router model.
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        refreshWindowSizeBoundsFromConnectedDisplays(notify: false)
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.refreshWindowSizeBoundsFromConnectedDisplays()
+            }
+        }
+    }
+
+    deinit {
+        if let screenParametersObserver {
+            NotificationCenter.default.removeObserver(screenParametersObserver)
+        }
+    }
+
+    /// Returns the current dynamic bounds used by window-size settings.
+    func defaultWindowSizeBoundsForSettings() -> WindowSizeBounds {
+        cachedWindowSizeBounds
     }
 
     /// Returns the toolbar button-size preference used in Settings.
@@ -1419,6 +1495,11 @@ final class AppRouting: ObservableObject {
         window.isReleasedWhenClosed = false
         window.setFrame(NSRect(origin: .zero, size: initialFrame.size), display: false)
         window.center()
+        let clampedCenteredFrame = clampedToVisibleScreen(
+            window.frame,
+            preferredScreen: window.screen ?? NSScreen.main
+        )
+        window.setFrame(clampedCenteredFrame, display: false)
 
         let windowID = UUID()
         let controller = DocumentWindowController(
@@ -1882,7 +1963,12 @@ final class AppRouting: ObservableObject {
         // First document window uses centred placement for a tidy initial feel.
         window.setFrame(NSRect(origin: .zero, size: size), display: false)
         window.center()
-        lastDocumentWindowFrame = window.frame
+        let clampedCenteredFrame = clampedToVisibleScreen(
+            window.frame,
+            preferredScreen: window.screen ?? NSScreen.main
+        )
+        window.setFrame(clampedCenteredFrame, display: false)
+        lastDocumentWindowFrame = clampedCenteredFrame
     }
 
     /// Returns the current key window if it looks like a normal document window.
@@ -1903,14 +1989,16 @@ final class AppRouting: ObservableObject {
 
     /// Clamps a frame into the visible area of the provided screen (or main).
     ///
-    /// This prevents cascaded windows from drifting out of bounds when many
-    /// local links are opened in sequence.
+    /// This prevents windows from opening oversized on smaller displays and
+    /// also keeps cascaded windows from drifting out of bounds.
     private func clampedToVisibleScreen(_ frame: NSRect, preferredScreen: NSScreen?) -> NSRect {
         guard let visibleFrame = preferredScreen?.visibleFrame ?? NSScreen.main?.visibleFrame else {
             return frame
         }
 
         var clamped = frame
+        clamped.size.width = max(1, min(clamped.width, visibleFrame.width))
+        clamped.size.height = max(1, min(clamped.height, visibleFrame.height))
         clamped.origin.x = min(max(clamped.origin.x, visibleFrame.minX), visibleFrame.maxX - clamped.width)
         clamped.origin.y = min(max(clamped.origin.y, visibleFrame.minY), visibleFrame.maxY - clamped.height)
         return clamped
@@ -2664,15 +2752,16 @@ final class AppRouting: ObservableObject {
 
     /// Returns one clamped default size for newly created windows.
     private func defaultWindowSizeForNewWindows() -> NSSize {
+        let bounds = defaultWindowSizeBoundsForSettings()
         let width = resolvedDefaultWindowDimension(
             key: AppPreferenceKey.defaultWindowWidth,
             fallback: AppPreferenceDefault.defaultWindowWidth,
-            range: 640...1800
+            range: bounds.widthRange
         )
         let height = resolvedDefaultWindowDimension(
             key: AppPreferenceKey.defaultWindowHeight,
             fallback: AppPreferenceDefault.defaultWindowHeight,
-            range: 420...1400
+            range: bounds.heightRange
         )
 
         return NSSize(width: width, height: height)
@@ -2693,6 +2782,96 @@ final class AppRouting: ObservableObject {
 
         let clampedValue = min(max(rawValue, range.lowerBound), range.upperBound)
         return CGFloat(clampedValue)
+    }
+
+    /// Recomputes dynamic window-size bounds from connected displays.
+    ///
+    /// We use the largest full display as the reference so users on
+    /// multi-display setups are not unnecessarily restricted by a smaller
+    /// auxiliary screen.
+    private func refreshWindowSizeBoundsFromConnectedDisplays(notify: Bool = true) {
+        let screens = NSScreen.screens
+        let currentScreenIDs = Set(screens.compactMap(screenID(for:)))
+        let recomputedBounds = computedWindowSizeBoundsFromConnectedDisplays(screens: screens)
+
+        let isInitialRefresh = cachedWindowSizeScreenIDs.isEmpty
+        let screenTopologyChanged = currentScreenIDs != cachedWindowSizeScreenIDs
+
+        var effectiveBounds = recomputedBounds
+        if !isInitialRefresh && !screenTopologyChanged {
+            // Keep maxima monotonic while the display set is unchanged. This
+            // prevents settings ranges from shrinking transiently (e.g. 1080 ->
+            // 1050) when menu-bar/Dock ownership changes between displays.
+            effectiveBounds = WindowSizeBounds(
+                minWidth: recomputedBounds.minWidth,
+                maxWidth: max(cachedWindowSizeBounds.maxWidth, recomputedBounds.maxWidth),
+                minHeight: recomputedBounds.minHeight,
+                maxHeight: max(cachedWindowSizeBounds.maxHeight, recomputedBounds.maxHeight)
+            )
+        }
+
+        let boundsChanged = effectiveBounds != cachedWindowSizeBounds
+        let screenIDsChanged = currentScreenIDs != cachedWindowSizeScreenIDs
+
+        cachedWindowSizeScreenIDs = currentScreenIDs
+        guard boundsChanged || screenIDsChanged else {
+            return
+        }
+
+        cachedWindowSizeBounds = effectiveBounds
+        if notify {
+            notifyWindowSizeBoundsChanged()
+        }
+    }
+
+    /// Derives dynamic min/max window-size bounds from current display metrics.
+    private func computedWindowSizeBoundsFromConnectedDisplays(screens: [NSScreen]) -> WindowSizeBounds {
+        guard let largestDisplayFrame = largestConnectedDisplayFrame(from: screens) else {
+            return WindowSizeBounds(
+                minWidth: defaultWindowBaselineMinWidth,
+                maxWidth: defaultWindowFallbackMaxWidth,
+                minHeight: defaultWindowBaselineMinHeight,
+                maxHeight: defaultWindowFallbackMaxHeight
+            )
+        }
+
+        let derivedMaxWidth = Int(floor(largestDisplayFrame.width))
+        let derivedMaxHeight = Int(floor(largestDisplayFrame.height))
+
+        let maxWidth = max(defaultWindowAbsoluteMinWidth, derivedMaxWidth)
+        let maxHeight = max(defaultWindowAbsoluteMinHeight, derivedMaxHeight)
+
+        let minWidth = min(defaultWindowBaselineMinWidth, maxWidth)
+        let minHeight = min(defaultWindowBaselineMinHeight, maxHeight)
+
+        return WindowSizeBounds(
+            minWidth: minWidth,
+            maxWidth: maxWidth,
+            minHeight: minHeight,
+            maxHeight: maxHeight
+        )
+    }
+
+    /// Returns the largest full display frame among currently connected screens.
+    ///
+    /// We intentionally use full `frame` here (not `visibleFrame`) so settings
+    /// ranges stay stable when menu bar / Dock ownership shifts across displays.
+    private func largestConnectedDisplayFrame(from screens: [NSScreen]) -> NSRect? {
+        screens
+            .map(\.frame)
+            .max(by: { lhs, rhs in
+                (lhs.width * lhs.height) < (rhs.width * rhs.height)
+            })
+    }
+
+    /// Returns the stable display identifier for one screen when available.
+    private func screenID(for screen: NSScreen) -> NSNumber? {
+        screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+    }
+
+    /// Bumps Settings refresh token after dynamic window-size bounds change.
+    private func notifyWindowSizeBoundsChanged() {
+        windowSizeBoundsRevision &+= 1
     }
 }
 
