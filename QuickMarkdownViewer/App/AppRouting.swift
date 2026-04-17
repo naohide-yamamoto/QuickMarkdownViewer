@@ -764,11 +764,19 @@ final class AppRouting: ObservableObject {
         let resolvedPreference = ToolbarButtonSizePreference.resolved(from: sizeMode)
         let currentPreference = toolbarButtonSizePreferenceForSettings()
 
+        // `NSToolbar.SizeMode` has no distinct "large" case. Our large mode is
+        // represented by `.regular` + expanded style, so ignore this sync path
+        // when that combination is already selected.
+        if currentPreference == .large, sizeMode == .regular {
+            return
+        }
+
         guard resolvedPreference != currentPreference else {
             return
         }
 
         defaults.set(resolvedPreference.rawValue, forKey: AppPreferenceKey.toolbarButtonSize)
+        applyToolbarButtonSizePreferenceToOpenWindows(resolvedPreference)
         notifyToolbarButtonSizePreferenceChanged()
     }
 
@@ -2746,7 +2754,7 @@ final class AppRouting: ObservableObject {
     /// Applies one toolbar size preference to all currently open windows.
     private func applyToolbarButtonSizePreferenceToOpenWindows(_ preference: ToolbarButtonSizePreference) {
         for controller in windowControllers.values {
-            controller.window?.toolbar?.sizeMode = preference.toolbarSizeMode
+            controller.applyToolbarButtonSizePreference(preference)
         }
     }
 
@@ -3194,6 +3202,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
 
     /// Configures one native, customisable toolbar for this document window.
     private func configureToolbar(on window: NSWindow) {
+        let toolbarPreference = AppRouting.shared.toolbarButtonSizePreferenceForSettings()
         let toolbar = DocumentWindowToolbar(identifier: ToolbarItemIdentifier.toolbar)
         toolbar.delegate = self
         toolbar.allowsUserCustomization = true
@@ -3201,7 +3210,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             toolbar.allowsDisplayModeCustomization = true
         }
         toolbar.autosavesConfiguration = true
-        toolbar.sizeMode = AppRouting.shared.toolbarButtonSizePreferenceForSettings().toolbarSizeMode
+        toolbar.sizeMode = toolbarPreference.toolbarSizeMode
         toolbar.showsBaselineSeparator = true
 
         if !hasSavedToolbarConfiguration() {
@@ -3209,7 +3218,7 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         }
 
         window.toolbar = toolbar
-        window.toolbarStyle = .automatic
+        window.toolbarStyle = toolbarPreference.toolbarWindowStyle
         managedToolbar = toolbar
 
         toolbar.onDisplayModeChanged = { [weak self] toolbar in
@@ -3242,6 +3251,8 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         toolbar.onSizeModeChanged = { toolbar in
             AppRouting.shared.syncToolbarButtonSizePreferenceFromToolbarSizeMode(toolbar.sizeMode)
         }
+
+        applyToolbarButtonSizePreference(toolbarPreference)
     }
 
     /// Returns true when AppKit already persisted user toolbar customisation.
@@ -3351,6 +3362,33 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         }
 
         window?.toolbar?.validateVisibleItems()
+    }
+
+    /// Applies one toolbar size preference to this window's toolbar controls.
+    func applyToolbarButtonSizePreference(_ preference: ToolbarButtonSizePreference) {
+        window?.toolbar?.sizeMode = preference.toolbarSizeMode
+        window?.toolbarStyle = preference.toolbarWindowStyle
+
+        if let toolbar = managedToolbar {
+            refreshSearchToolbarItem(in: toolbar)
+        }
+
+        resolveToolbarSearchReferences()
+        toolbarSearchToolbarItem?.preferredWidthForSearchField = preference.searchPreferredWidth
+        toolbarSearchField?.controlSize = preference.searchFieldControlSize
+        if let searchFieldCell = toolbarSearchField?.cell as? NSSearchFieldCell {
+            searchFieldCell.controlSize = preference.searchFieldControlSize
+        }
+    }
+
+    /// Rebuilds the Search toolbar item to apply current size/style settings.
+    private func refreshSearchToolbarItem(in toolbar: NSToolbar) {
+        guard let searchIndex = toolbar.items.firstIndex(where: { $0.itemIdentifier == ToolbarItemIdentifier.search }) else {
+            return
+        }
+
+        toolbar.removeItem(at: searchIndex)
+        toolbar.insertItem(withItemIdentifier: ToolbarItemIdentifier.search, at: searchIndex)
     }
 
     /// Resolves the currently inserted toolbar search field, if available.
@@ -4104,11 +4142,15 @@ extension DocumentWindowController: NSToolbarDelegate {
             item.paletteLabel = "Search"
             item.toolTip = "Search the current document"
             item.visibilityPriority = .high
-            item.preferredWidthForSearchField = 220
+            let toolbarPreference = AppRouting.shared.toolbarButtonSizePreferenceForSettings()
+            item.preferredWidthForSearchField = toolbarPreference.searchPreferredWidth
             item.resignsFirstResponderWithCancel = true
 
             let searchField = item.searchField
-            searchField.controlSize = .small
+            searchField.controlSize = toolbarPreference.searchFieldControlSize
+            if let searchFieldCell = searchField.cell as? NSSearchFieldCell {
+                searchFieldCell.controlSize = toolbarPreference.searchFieldControlSize
+            }
             searchField.delegate = self
             searchField.sendsSearchStringImmediately = true
             searchField.sendsWholeSearchString = true
@@ -4308,6 +4350,41 @@ private extension ToolbarButtonSizePreference {
             return .small
         case .standard:
             return .regular
+        case .large:
+            return .regular
+        }
+    }
+
+    var toolbarWindowStyle: NSWindow.ToolbarStyle {
+        switch self {
+        case .small:
+            return .unifiedCompact
+        case .standard:
+            return .unified
+        case .large:
+            return .expanded
+        }
+    }
+
+    var searchFieldControlSize: NSControl.ControlSize {
+        switch self {
+        case .small:
+            return .small
+        case .standard:
+            return .regular
+        case .large:
+            return .large
+        }
+    }
+
+    var searchPreferredWidth: CGFloat {
+        switch self {
+        case .small:
+            return 210
+        case .standard:
+            return 250
+        case .large:
+            return 290
         }
     }
 

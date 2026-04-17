@@ -76,7 +76,7 @@ enum AppPreferenceDefault {
     static let documentDensity = DocumentDensity.standard.rawValue
 
     /// Default toolbar button size.
-    static let toolbarButtonSize = ToolbarButtonSizePreference.small.rawValue
+    static let toolbarButtonSize = ToolbarButtonSizePreference.standard.rawValue
 }
 
 /// Available document typefaces for rendered Markdown typography.
@@ -133,6 +133,7 @@ enum DocumentDensity: String, CaseIterable, Identifiable {
 enum ToolbarButtonSizePreference: String, CaseIterable, Identifiable {
     case small
     case standard
+    case large
 
     var id: String { rawValue }
 
@@ -142,6 +143,8 @@ enum ToolbarButtonSizePreference: String, CaseIterable, Identifiable {
             return "Small"
         case .standard:
             return "Standard"
+        case .large:
+            return "Large"
         }
     }
 
@@ -150,7 +153,7 @@ enum ToolbarButtonSizePreference: String, CaseIterable, Identifiable {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
-        return ToolbarButtonSizePreference(rawValue: normalizedRawValue) ?? .small
+        return ToolbarButtonSizePreference(rawValue: normalizedRawValue) ?? .standard
     }
 }
 
@@ -310,7 +313,7 @@ private struct QuickMarkdownViewerSettingsView: View {
     @State private var selectedAppearancePreference: AppRouting.AppearancePreference = .system
 
     /// Selected toolbar button size in General tab.
-    @State private var selectedToolbarButtonSizePreference: ToolbarButtonSizePreference = .small
+    @State private var selectedToolbarButtonSizePreference: ToolbarButtonSizePreference = .standard
 
     /// Editable text backing for default window width input.
     @State private var defaultWindowWidthInput = ""
@@ -640,7 +643,7 @@ private struct QuickMarkdownViewerSettingsView: View {
                     .padding(.top, 2)
                     .padding(.bottom, 4)
 
-                    appearancePaneRow("Toolbar button size:", alignment: .center) {
+                    appearancePaneRow("Toolbar size:", alignment: .center) {
                         Picker("", selection: $selectedToolbarButtonSizePreference) {
                             ForEach(ToolbarButtonSizePreference.allCases) { option in
                                 Text(option.displayName).tag(option)
