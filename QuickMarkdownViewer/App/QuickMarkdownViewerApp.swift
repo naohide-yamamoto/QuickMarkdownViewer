@@ -236,6 +236,16 @@ private struct QuickMarkdownViewerSettingsView: View {
     private enum SettingsTab: Hashable {
         case general
         case appearance
+
+        /// Preferred window height for each pane.
+        var preferredWindowHeight: CGFloat {
+            switch self {
+            case .general:
+                return 260
+            case .appearance:
+                return 445
+            }
+        }
     }
 
     /// Focusable fields within the default window-size row.
@@ -297,6 +307,9 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Selected Settings tab.
     @State private var selectedTab: SettingsTab = .general
 
+    /// Current Settings window height, adjusted per selected pane.
+    @State private var settingsWindowHeight: CGFloat = SettingsTab.general.preferredWindowHeight
+
     /// Available app options for default Markdown viewer selection.
     @State private var markdownViewerOptions: [AppRouting.MarkdownViewerAppOption] = []
 
@@ -350,7 +363,16 @@ private struct QuickMarkdownViewerSettingsView: View {
     /// Sized to fit "Quick Markdown Viewer" in full while remaining compact.
     private let generalAppPickerWidth: CGFloat = 210
 
+    /// Fixed label width used by rows in the General pane.
+    private let generalRowLabelWidth: CGFloat = 180
+
+    /// Fixed Settings window width shared across panes.
+    private let settingsWindowWidth: CGFloat = 700
+
     private let appearanceRowLabelWidth: CGFloat = 160
+    private let appearanceWideControlWidth: CGFloat = 460
+    private let appearanceInlinePickerSpacing: CGFloat = 6
+    private let appearanceInlineControlGroupSpacing: CGFloat = 16
 
     private var selectedSyntaxHighlightTheme: SyntaxHighlightTheme {
         SyntaxHighlightTheme.resolved(from: syntaxHighlightingThemeRawValue)
@@ -479,60 +501,67 @@ private struct QuickMarkdownViewerSettingsView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             Form {
-                LabeledContent("Default Markdown viewer:") {
-                    GeneralPaneAppPicker(
-                        selectionID: $selectedMarkdownViewerBundleID,
-                        options: markdownViewerPopupOptions
-                    )
-                    .frame(width: generalAppPickerWidth, height: 24)
-                    .disabled(markdownViewerOptions.isEmpty)
-                }
-
-                LabeledContent("View source with:") {
-                    GeneralPaneAppPicker(
-                        selectionID: $selectedViewSourceAppID,
-                        options: viewSourceAppPopupOptions
-                    )
-                    .frame(width: generalAppPickerWidth, height: 24)
-                    .disabled(viewSourceAppOptions.isEmpty)
-                }
-
-                LabeledContent("Updates:") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Toggle(
-                            "Automatically check for updates",
-                            isOn: $automaticUpdateCheckEnabled
+                VStack(alignment: .leading, spacing: 0) {
+                    generalPaneRow("Default Markdown viewer:", alignment: .center) {
+                        GeneralPaneAppPicker(
+                            selectionID: $selectedMarkdownViewerBundleID,
+                            options: markdownViewerPopupOptions
                         )
-
-                        Text("When enabled, Quick Markdown Viewer automatically contacts GitHub to check for updates.")
-                            .foregroundStyle(.secondary)
-                            .font(.footnote)
+                        .frame(width: generalAppPickerWidth, height: 24)
+                        .disabled(markdownViewerOptions.isEmpty)
                     }
-                }
+                    .padding(.vertical, 4)
 
-                LabeledContent("Reset:") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Press this button to restore the default settings in this pane only")
+                    generalPaneRow("View source with:", alignment: .center) {
+                        GeneralPaneAppPicker(
+                            selectionID: $selectedViewSourceAppID,
+                            options: viewSourceAppPopupOptions
+                        )
+                        .frame(width: generalAppPickerWidth, height: 24)
+                        .disabled(viewSourceAppOptions.isEmpty)
+                    }
+                    .padding(.vertical, 4)
 
-                        Button("Reset General Settings") {
-                            isShowingGeneralResetConfirmation = true
+                    generalPaneRow("Updates:") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Toggle(
+                                "Automatically check for updates",
+                                isOn: $automaticUpdateCheckEnabled
+                            )
+
+                            Text("When enabled, Quick Markdown Viewer automatically contacts GitHub to check for updates.")
+                                .foregroundStyle(.secondary)
+                                .font(.footnote)
                         }
                     }
-                }
-                .padding(.top, 6)
+                    .padding(.vertical, 4)
 
-                LabeledContent("Reset all settings:") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Press this button to restore the default settings across all panes")
+                    generalPaneRow("Reset:") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Press this button to restore the default settings in this pane only")
 
-                        Button("Reset All Settings") {
-                            isShowingResetConfirmation = true
+                            Button("Reset General Settings") {
+                                isShowingGeneralResetConfirmation = true
+                            }
                         }
                     }
+                    .padding(.top, 6)
+
+                    generalPaneRow("Reset all settings:") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Press this button to restore the default settings across all panes")
+
+                            Button("Reset All Settings") {
+                                isShowingResetConfirmation = true
+                            }
+                        }
+                    }
+                    .padding(.top, 6)
                 }
-                .padding(.top, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .tabItem {
                 Label("General", systemImage: "gearshape")
             }
@@ -588,6 +617,7 @@ private struct QuickMarkdownViewerSettingsView: View {
                                 .foregroundStyle(.secondary)
                                 .monospacedDigit()
                         }
+                        .frame(width: appearanceWideControlWidth, alignment: .leading)
                     }
                     .padding(.vertical, 4)
 
@@ -654,29 +684,23 @@ private struct QuickMarkdownViewerSettingsView: View {
                     .padding(.vertical, 4)
 
                     appearancePaneRow("Document style:", alignment: .center) {
-                        HStack(spacing: 16) {
-                            HStack(spacing: 2) {
-                                Text("Typeface:")
-                                    .foregroundStyle(.secondary)
+                        HStack(spacing: appearanceInlineControlGroupSpacing) {
+                            appearanceInlineLabeledControl("Typeface", controlWidth: 140) {
                                 Picker("", selection: $documentTypefaceRawValue) {
                                     ForEach(DocumentTypeface.allCases) { typeface in
                                         Text(typeface.displayName).tag(typeface.rawValue)
                                     }
                                 }
                                 .labelsHidden()
-                                .frame(width: 140)
                             }
 
-                            HStack(spacing: 2) {
-                                Text("Density:")
-                                    .foregroundStyle(.secondary)
+                            appearanceInlineLabeledControl("Density", controlWidth: 120) {
                                 Picker("", selection: $documentDensityRawValue) {
                                     ForEach(DocumentDensity.allCases) { density in
                                         Text(density.displayName).tag(density.rawValue)
                                     }
                                 }
                                 .labelsHidden()
-                                .frame(width: 120)
                             }
                         }
                     }
@@ -686,16 +710,13 @@ private struct QuickMarkdownViewerSettingsView: View {
                         VStack(alignment: .leading, spacing: 8) {
                             Toggle("Highlight code blocks", isOn: $syntaxHighlightingEnabled)
 
-                            HStack(spacing: 2) {
-                                Text("Theme:")
-                                    .foregroundStyle(.secondary)
+                            appearanceInlineLabeledControl("Theme", controlWidth: 170) {
                                 Picker("", selection: $syntaxHighlightingThemeRawValue) {
                                     ForEach(SyntaxHighlightTheme.allCases) { theme in
                                         Text(theme.displayName).tag(theme.rawValue)
                                     }
                                 }
                                 .labelsHidden()
-                                .frame(width: 170)
                                 .disabled(!syntaxHighlightingEnabled)
                             }
                         }
@@ -703,15 +724,13 @@ private struct QuickMarkdownViewerSettingsView: View {
                     .padding(.vertical, 4)
 
                     appearancePaneRow("") {
-                        if selectedTab == .appearance {
-                            SyntaxHighlightPreviewPanel(
-                                theme: selectedSyntaxHighlightTheme,
-                                typeface: selectedDocumentTypeface,
-                                density: selectedDocumentDensity,
-                                isHighlightingEnabled: syntaxHighlightingEnabled,
-                                isDarkMode: colorScheme == .dark
-                            )
-                        }
+                        SyntaxHighlightPreviewPanel(
+                            theme: selectedSyntaxHighlightTheme,
+                            typeface: selectedDocumentTypeface,
+                            density: selectedDocumentDensity,
+                            isHighlightingEnabled: syntaxHighlightingEnabled,
+                            isDarkMode: colorScheme == .dark
+                        )
                     }
                     .padding(.vertical, 2)
 
@@ -729,6 +748,7 @@ private struct QuickMarkdownViewerSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             .alert("Reset Appearance settings?", isPresented: $isShowingAppearanceResetConfirmation) {
                 Button("Cancel", role: .cancel) {}
             Button("Reset Appearance Settings", role: .destructive) {
@@ -742,11 +762,23 @@ private struct QuickMarkdownViewerSettingsView: View {
             }
             .tag(SettingsTab.appearance)
         }
-        .frame(minWidth: 560, idealWidth: 620, minHeight: 420)
+        .frame(
+            minWidth: settingsWindowWidth,
+            idealWidth: settingsWindowWidth,
+            maxWidth: settingsWindowWidth,
+            minHeight: settingsWindowHeight,
+            idealHeight: settingsWindowHeight,
+            maxHeight: settingsWindowHeight,
+            alignment: .topLeading
+        )
         .onAppear {
+            settingsWindowHeight = selectedTab.preferredWindowHeight
             refreshGeneralTabState()
             clampStoredDefaultWindowSizeToCurrentBounds()
             syncWindowSizeInputFieldsFromStoredValues()
+        }
+        .onChange(of: selectedTab) { newTab in
+            settingsWindowHeight = newTab.preferredWindowHeight
         }
         .onChange(of: selectedMarkdownViewerBundleID) { newBundleID in
             if suppressNextMarkdownViewerSelectionChange {
@@ -1077,6 +1109,41 @@ private struct QuickMarkdownViewerSettingsView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Shared row layout used by General pane for fixed right-aligned labels.
+    @ViewBuilder
+    private func generalPaneRow<Content: View>(
+        _ title: String,
+        alignment: VerticalAlignment = .top,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(alignment: alignment, spacing: 12) {
+            Text(title)
+                .frame(width: generalRowLabelWidth, alignment: .trailing)
+                .fixedSize(horizontal: true, vertical: false)
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Shared inline layout for `Label: [picker]` controls in the Appearance pane.
+    @ViewBuilder
+    private func appearanceInlineLabeledControl<Control: View>(
+        _ label: String,
+        controlWidth: CGFloat,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(spacing: 0) {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Text(":")
+                .foregroundStyle(.secondary)
+            control()
+                .frame(width: controlWidth)
+                .padding(.leading, appearanceInlinePickerSpacing)
+        }
     }
 
     /// Parses one `#RRGGBB` colour string into an `NSColor`.
