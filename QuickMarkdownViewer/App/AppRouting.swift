@@ -3203,6 +3203,24 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
     /// Configures one native, customisable toolbar for this document window.
     private func configureToolbar(on window: NSWindow) {
         let toolbarPreference = AppRouting.shared.toolbarButtonSizePreferenceForSettings()
+        installToolbar(
+            on: window,
+            preference: toolbarPreference,
+            preservedDisplayMode: nil,
+            preservedVisibility: nil
+        )
+        applyToolbarSearchSizing(toolbarPreference)
+        syncFindControlsFromState()
+        refreshToolbarItemState()
+    }
+
+    /// Installs one native toolbar instance on the document window.
+    private func installToolbar(
+        on window: NSWindow,
+        preference: ToolbarButtonSizePreference,
+        preservedDisplayMode: NSToolbar.DisplayMode?,
+        preservedVisibility: Bool?
+    ) {
         let toolbar = DocumentWindowToolbar(identifier: ToolbarItemIdentifier.toolbar)
         toolbar.delegate = self
         toolbar.allowsUserCustomization = true
@@ -3210,17 +3228,28 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
             toolbar.allowsDisplayModeCustomization = true
         }
         toolbar.autosavesConfiguration = true
-        toolbar.sizeMode = toolbarPreference.toolbarSizeMode
+        toolbar.sizeMode = preference.toolbarSizeMode
         toolbar.showsBaselineSeparator = true
 
-        if !hasSavedToolbarConfiguration() {
+        if let preservedDisplayMode {
+            toolbar.displayMode = preservedDisplayMode
+        } else if !hasSavedToolbarConfiguration() {
             toolbar.displayMode = .iconOnly
         }
 
+        resetToolbarItemReferences()
         window.toolbar = toolbar
-        window.toolbarStyle = toolbarPreference.toolbarWindowStyle
+        window.toolbarStyle = preference.toolbarWindowStyle
+        if let preservedVisibility {
+            toolbar.isVisible = preservedVisibility
+        }
         managedToolbar = toolbar
 
+        installToolbarCallbacks(toolbar)
+    }
+
+    /// Installs toolbar callbacks used for sync and search-item rebuilds.
+    private func installToolbarCallbacks(_ toolbar: DocumentWindowToolbar) {
         toolbar.onDisplayModeChanged = { [weak self] toolbar in
             guard let self else {
                 return
@@ -3251,14 +3280,29 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
         toolbar.onSizeModeChanged = { toolbar in
             AppRouting.shared.syncToolbarButtonSizePreferenceFromToolbarSizeMode(toolbar.sizeMode)
         }
-
-        applyToolbarButtonSizePreference(toolbarPreference)
     }
 
     /// Returns true when AppKit already persisted user toolbar customisation.
     private func hasSavedToolbarConfiguration() -> Bool {
         let defaultsKey = "NSToolbar Configuration \(ToolbarItemIdentifier.toolbar)"
         return UserDefaults.standard.object(forKey: defaultsKey) != nil
+    }
+
+    /// Clears weak references to toolbar items before rebuilding toolbar.
+    private func resetToolbarItemReferences() {
+        toolbarSearchField = nil
+        toolbarSearchToolbarItem = nil
+        shareToolbarItem = nil
+        viewSourceToolbarItem = nil
+        zoomToFitToolbarItem = nil
+        actualSizeToolbarItem = nil
+        printToolbarItem = nil
+        exportPDFToolbarItem = nil
+        searchToolbarGenericItem = nil
+        zoomLegacyGroupItem = nil
+        zoomOutInGroupItem = nil
+        printExportGroupItem = nil
+        appearanceGroupItem = nil
     }
 
     /// Installs observation hooks used for toolbar enabled-state refreshes.
@@ -3366,13 +3410,25 @@ private final class DocumentWindowController: NSWindowController, NSWindowDelega
 
     /// Applies one toolbar size preference to this window's toolbar controls.
     func applyToolbarButtonSizePreference(_ preference: ToolbarButtonSizePreference) {
-        window?.toolbar?.sizeMode = preference.toolbarSizeMode
-        window?.toolbarStyle = preference.toolbarWindowStyle
-
-        if let toolbar = managedToolbar {
-            refreshSearchToolbarItem(in: toolbar)
+        guard let window else {
+            return
         }
 
+        let previousDisplayMode = managedToolbar?.displayMode
+        let previousVisibility = managedToolbar?.isVisible
+        installToolbar(
+            on: window,
+            preference: preference,
+            preservedDisplayMode: previousDisplayMode,
+            preservedVisibility: previousVisibility
+        )
+        applyToolbarSearchSizing(preference)
+        syncFindControlsFromState()
+        refreshToolbarItemState()
+    }
+
+    /// Applies search-control sizing from toolbar preference.
+    private func applyToolbarSearchSizing(_ preference: ToolbarButtonSizePreference) {
         resolveToolbarSearchReferences()
         toolbarSearchToolbarItem?.preferredWidthForSearchField = preference.searchPreferredWidth
         toolbarSearchField?.controlSize = preference.searchFieldControlSize
