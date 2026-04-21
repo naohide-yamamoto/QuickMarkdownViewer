@@ -4,22 +4,46 @@ All notable changes to Quick Markdown Viewer are tracked in this file from `v1.0
 
 This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning.
 
-## [Unreleased]
+## [1.1.0] - 2026-04-21
 
 ### Added
+- Native Settings window (`⌘,`) with General and Appearance panes.
 - App-menu `Check for Updates…` command under `Quick Markdown Viewer`, with native result dialogs.
-- Optional automatic update checking (off by default) that only requests GitHub release metadata.
+- Optional automatic update checking (off by default) that checks GitHub for newer releases without downloading updates automatically.
+- Default Markdown viewer selector in Settings.
 - Configurable `View source with` setting in `Settings > General`:
   - choose an installed editor for `File > View Source`
   - use `Select…` to choose another app from `/Applications`
   - fall back to the system default text editor if the selected app is unavailable
-- Settings window with:
-  - `General` pane for default-app, View Source, and update-check preferences
-  - `Appearance` pane for window-background controls
-  - pane-scoped reset for Appearance plus a global reset action in General
+- Appearance preferences in Settings:
+  - appearance mode (`System`, `Light`, `Dark`)
+  - light/dark window background colours
+  - visible background amount
+  - default window size
+  - toolbar size (`Small`, `Standard`, `Large`)
+  - document typeface (`Sans-serif`, `Serif`)
+  - document density (`Standard`, `Compact`)
+  - pane-scoped reset action
+- Global reset action for all Settings panes.
+- Optional bundled local syntax highlighting for fenced code blocks using `highlight.js`.
+- Syntax theme families:
+  - GitHub
+  - VS Code
+  - Atom One
+  - Stack Overflow
+- Syntax theme preview in the Appearance pane.
+- Adaptive toolbar Search item that collapses to a magnifying-glass button in narrow windows and expands in wider windows.
 
 ### Fixed
 - Removed first-document open background flashing on app launch by restoring the stable v1.0.5 load transition path and resolving light/dark background colours in CSS rather than SwiftUI render-time state.
+- Disabled document-only toolbar actions, such as View Source, when no document is open.
+
+### Changed
+- `⌘E` now expands/focuses toolbar Search after successfully using selected text for Find.
+- Removed `⌘J` / Jump to Selection behaviour from the app.
+- Release artefact filenames now include the app version (for example, `QuickMarkdownViewer-v1.1.0-macOS.zip` and `QuickMarkdownViewer-v1.1.0-macOS-SHA256.txt`).
+- Local rendering documentation now covers bundled `highlight.js` alongside `markdown-it`.
+- Third-party notices now include bundled `highlight.js` and bundled syntax theme CSS files.
 
 ## [1.0.5] - 2026-04-09
 

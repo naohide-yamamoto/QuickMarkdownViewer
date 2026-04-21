@@ -51,7 +51,7 @@ enum AppPreferenceDefault {
     /// Default height for newly opened windows.
     static let defaultWindowHeight = 760
 
-    /// v1.0.6 default: about half the legacy v1.0.5 background framing.
+    /// v1.1.0 default: about half the legacy v1.0.5 background framing.
     static let windowBackgroundVisibility = 0.5
 
     /// Default selected light-mode background colour.
@@ -224,7 +224,7 @@ struct QuickMarkdownViewerApp: App {
     }
 }
 
-/// v1.0.6 settings panel with tab-specific controls and reset actions.
+/// v1.1.0 settings panel with tab-specific controls and reset actions.
 private struct QuickMarkdownViewerSettingsView: View {
     /// Sentinel picker ID used for the bottom "Select…" action row.
     private static let selectDefaultViewerOptionID = "__qmv.selectDefaultViewer__"
@@ -897,7 +897,7 @@ private struct QuickMarkdownViewerSettingsView: View {
         }
     }
 
-    /// Restores all settings currently exposed in the v1.0.6 Settings window.
+    /// Restores all settings currently exposed in the v1.1.0 Settings window.
     ///
     /// This is intentionally global (all tabs), not scoped to one tab.
     private func resetAllSettingsToDefaults() {

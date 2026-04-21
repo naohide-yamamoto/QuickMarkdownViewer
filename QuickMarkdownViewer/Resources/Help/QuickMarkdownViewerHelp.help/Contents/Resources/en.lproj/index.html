@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="AppleTitle" content="Quick Markdown Viewer Help">
   <meta name="description" content="Help for Quick Markdown Viewer">
-  <meta name="keywords" content="quick markdown viewer, markdown, help, open, search, zoom, print, export">
+  <meta name="keywords" content="quick markdown viewer, markdown, help, open, search, zoom, print, export, settings, syntax highlighting, updates">
   <title>Quick Markdown Viewer Help</title>
   <style>
     :root {
@@ -74,8 +74,8 @@
 <body>
   <a id="index" name="index"></a>
   <h1>Quick Markdown Viewer</h1>
-  <p>Quick Markdown Viewer is a simple app for opening Markdown files as clean, rendered documents on macOS.</p>
-  <p>It is designed for people who just want to read Markdown quickly, without editing tools or setup.</p>
+  <p>Quick Markdown Viewer is a native Markdown viewer for opening Markdown files as clean, rendered documents on macOS.</p>
+  <p>It is designed to feel like using Mac's Preview app for viewing Markdown documents, without editing tools or setup.</p>
   <p>Quick Markdown Viewer is free and open-source. If you find it useful, <a href="https://ko-fi.com/naohideyamamoto">optional contributions are greatly appreciated</a> and help cover ongoing maintenance costs. Contributions are voluntary and do not change Quick Markdown Viewer&rsquo;s functionality.</p>
   <p class="subtle">For developer and release details, see the repository&rsquo;s <code>README.developers.md</code>.</p>
 
@@ -87,7 +87,7 @@
       <li><a href="#quick-start">Quick Start</a></li>
       <li><a href="#supported-file-types">Supported File Types</a></li>
       <li><a href="#markdown-compatibility">Markdown Compatibility</a></li>
-      <li><a href="#set-as-the-default-app-in-finder">Set as the Default App in Finder</a></li>
+      <li><a href="#set-as-the-default-app">Set as the Default App</a></li>
       <li><a href="#full-functionality">Full Functionality</a></li>
       <li><a href="#keyboard-shortcuts">Keyboard Shortcuts</a></li>
       <li><a href="#licence">Licence</a></li>
@@ -104,7 +104,7 @@
   <ul>
     <li>Quickly opening Markdown files with proper headings, lists, tables, images, and other common Markdown features.</li>
     <li>Reading Markdown locally on your Mac without uploading documents to a remote rendering service.</li>
-    <li>A lightweight &lsquo;Preview for Markdown&rsquo; workflow on Mac.</li>
+    <li>A native &lsquo;Preview for Markdown&rsquo; workflow on Mac.</li>
   </ul>
 
   <h2 id="system-requirements">System Requirements</h2>
@@ -116,7 +116,7 @@
   <h2 id="quick-start">Quick Start</h2>
   <ol>
     <li>Go to this repository&rsquo;s Releases page.</li>
-    <li>Download the latest app ZIP (<code>QuickMarkdownViewer-macOS.zip</code>).</li>
+    <li>Download the latest app ZIP (<code>QuickMarkdownViewer-v&lt;version&gt;-macOS.zip</code>).</li>
     <li>Open the ZIP and drag <code>Quick Markdown Viewer.app</code> into <code>Applications</code>.</li>
     <li>Open the app once.</li>
     <li>Open a Markdown file by either:
@@ -138,6 +138,7 @@
     <li><code>.mkdn</code></li>
     <li><code>.mdwn</code></li>
   </ul>
+  <p>If you select Quick Markdown Viewer as the default Markdown viewer in Settings (<code>⌘,</code>), macOS applies that choice to its grouped Markdown types (currently <code>.md</code> and <code>.markdown</code>).</p>
   <p>Quick Markdown Viewer intentionally does not support:</p>
   <ul>
     <li><code>.rmd</code></li>
@@ -147,7 +148,14 @@
   <h2 id="markdown-compatibility">Markdown Compatibility</h2>
   <p>Quick Markdown Viewer is intended for standard Markdown document rendering. It is not designed to reproduce non-standard or modified Markdown formats. For example, GitHub-style links to section headings are not a Quick Markdown Viewer compatibility target.</p>
 
-  <h2 id="set-as-the-default-app-in-finder">Set as the Default App in Finder</h2>
+  <h2 id="set-as-the-default-app">Set as the Default App</h2>
+  <p>You can set Quick Markdown Viewer as the default Markdown viewer from Settings:</p>
+  <ol>
+    <li>Open Quick Markdown Viewer.</li>
+    <li>Open Settings (<code>⌘,</code>).</li>
+    <li>In the General pane, choose <strong>Quick Markdown Viewer</strong> as the default Markdown viewer.</li>
+  </ol>
+  <p>You can also use Finder:</p>
   <ol>
     <li>Select a Markdown file in Finder and press <code>⌘I</code>.</li>
     <li>In <strong>Open with</strong>, choose <strong>Quick Markdown Viewer</strong>.</li>
@@ -159,6 +167,18 @@
     <li>Read-only Markdown viewing (no editing surface).</li>
     <li>One document per window.</li>
     <li>Native customisable macOS toolbar with persisted layout/display mode.</li>
+    <li>Native Settings window (<code>⌘,</code>) with General and Appearance panes:
+      <ul>
+        <li>General: default Markdown viewer, View Source app, update checking, and reset actions</li>
+        <li>Appearance: appearance mode, background colours, visible background amount, default window size, toolbar size, document style, syntax highlighting, and reset actions</li>
+      </ul>
+    </li>
+    <li>Document style controls in Settings:
+      <ul>
+        <li>Typeface: <code>Sans-serif</code> or <code>Serif</code></li>
+        <li>Density: <code>Standard</code> or <code>Compact</code></li>
+      </ul>
+    </li>
     <li>File open from:
       <ul>
         <li>double-click in Finder (when associated)</li>
@@ -176,6 +196,12 @@
     <li>External links open in your default browser or mail app.</li>
     <li>Local Markdown links open in a new Quick Markdown Viewer window.</li>
     <li>Relative local images are rendered from the document folder.</li>
+    <li>Syntax highlighting in Settings (for fenced code blocks only; off by default).
+      <ul>
+        <li>On-screen code uses the selected theme.</li>
+        <li>Print and PDF export always use that theme&rsquo;s light-mode colours.</li>
+      </ul>
+    </li>
     <li>In-document search:
       <ul>
         <li><code>⌘F</code> find</li>
@@ -183,6 +209,12 @@
         <li><code>Shift+⌘G</code> previous</li>
         <li><code>⌘E</code> use selection for find</li>
         <li>case-insensitive and case-sensitive modes</li>
+      </ul>
+    </li>
+    <li>Adaptive toolbar Search:
+      <ul>
+        <li>expands to a normal search field in wide windows</li>
+        <li>collapses to a magnifying-glass button in narrow windows</li>
       </ul>
     </li>
     <li>With the toolbar hidden, <code>⌘F</code> opens a compact native find panel with the same query/mode state as toolbar search.</li>
@@ -199,12 +231,23 @@
     <li>Print rendered Markdown (<code>⌘P</code>).</li>
     <li>Export rendered Markdown as PDF.</li>
     <li>Native speech controls under <code>Edit &gt; Speech</code> (<code>Start Speaking</code> / <code>Stop Speaking</code>).</li>
-    <li>View raw source in your default plain-text editor.</li>
+    <li>View raw source in the app selected in <code>Settings &gt; General &gt; View source with</code>.
+      <ul>
+        <li>If the selected app becomes unavailable, Quick Markdown Viewer falls back to the system default text editor.</li>
+      </ul>
+    </li>
+    <li><code>Check for Updates…</code> in the app menu, with optional automatic checking.
+      <ul>
+        <li>Automatic checking is off by default.</li>
+        <li>When enabled, Quick Markdown Viewer contacts GitHub only to check whether a newer version is available.</li>
+      </ul>
+    </li>
   </ul>
 
   <h2 id="keyboard-shortcuts">Keyboard Shortcuts</h2>
   <ul>
     <li><code>⌘O</code>: open file</li>
+    <li><code>⌘,</code>: open Settings</li>
     <li><code>⌘F</code>: find in document</li>
     <li><code>⌘G</code>: find next</li>
     <li><code>Shift+⌘G</code>: find previous</li>
@@ -243,13 +286,16 @@
         <li><code>Flexible Space</code> may not visibly resize with window width changes in some toolbar layouts. This behaviour is also seen in Apple&rsquo;s Preview on the same macOS version and is currently treated as system-level/AppKit style interaction.</li>
       </ul>
     </li>
+    <li>On some macOS builds, the app menu <code>Settings…</code> item may still display the generic gear icon even when Quick Markdown Viewer requests <code>gearshape</code>.</li>
+    <li>Default-app association UI may not live-refresh across open windows. For example, changing the Markdown default app in Quick Markdown Viewer Settings may not immediately update an already-open Finder <code>Get Info</code> panel, and changing it in Finder may not immediately update an already-open Quick Markdown Viewer Settings pane.</li>
   </ul>
 
   <h2 id="troubleshooting">Troubleshooting</h2>
   <ul>
     <li>File does not open: confirm the file extension is supported.</li>
     <li>Image is missing: check that the image path is correct relative to the Markdown file location.</li>
-    <li><code>.md</code> opens in another app: set Quick Markdown Viewer as default via Finder (<strong>Open with &gt; Change All&hellip;</strong>).</li>
+    <li><code>.md</code> opens in another app: set Quick Markdown Viewer as default via <code>Settings…</code> or Finder (<strong>Open with &gt; Change All&hellip;</strong>).</li>
+    <li>Window opens too large or goes beyond the screen: open Settings (<code>⌘,</code>) and reduce the default window size in the Appearance pane.</li>
   </ul>
 
   <h2 id="what-quick-markdown-viewer-is-not-for">What Quick Markdown Viewer Is Not For</h2>

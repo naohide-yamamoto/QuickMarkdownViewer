@@ -64,6 +64,10 @@ if ! command -v xcrun >/dev/null 2>&1; then
   echo "error: xcrun not found. Install Xcode command line tools first." >&2
   exit 1
 fi
+if [[ ! -x "/usr/libexec/PlistBuddy" ]]; then
+  echo "error: /usr/libexec/PlistBuddy not found. Install Xcode command line tools first." >&2
+  exit 1
+fi
 
 mkdir -p "${OUTPUT_DIR}"
 APP_BASENAME="$(basename "${APP_PATH}" .app)"
@@ -74,8 +78,21 @@ if [[ -z "${ASSET_BASENAME}" ]]; then
   echo "error: could not derive a valid release asset base name from ${APP_BASENAME}" >&2
   exit 1
 fi
-ZIP_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-macOS.zip"
-SHA256_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-macOS-SHA256.txt"
+INFO_PLIST_PATH="${APP_PATH}/Contents/Info.plist"
+if [[ ! -f "${INFO_PLIST_PATH}" ]]; then
+  echo "error: Info.plist not found at ${INFO_PLIST_PATH}" >&2
+  exit 1
+fi
+
+APP_VERSION="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "${INFO_PLIST_PATH}" 2>/dev/null || true)"
+APP_VERSION="$(printf '%s' "${APP_VERSION}" | tr -cd '[:alnum:]._-')"
+if [[ -z "${APP_VERSION}" ]]; then
+  echo "error: could not read CFBundleShortVersionString from ${INFO_PLIST_PATH}" >&2
+  exit 1
+fi
+
+ZIP_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-v${APP_VERSION}-macOS.zip"
+SHA256_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-v${APP_VERSION}-macOS-SHA256.txt"
 
 echo "==> Creating release ZIP"
 rm -f "${ZIP_PATH}" "${SHA256_PATH}"

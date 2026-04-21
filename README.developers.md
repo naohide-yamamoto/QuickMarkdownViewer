@@ -1,13 +1,13 @@
 # Quick Markdown Viewer
 
-Quick Markdown Viewer is a simple Markdown viewer for macOS.
+Quick Markdown Viewer is a native Markdown viewer for macOS.
 
 It is designed to feel like Preview for Markdown:
 - Double-click a Markdown file
 - Open immediately in a rendered document window
 - No source pane and no editing UI
 
-Current release: `v1.0.5`.
+Current release: `v1.1.0`.
 
 ## Contents
 
@@ -17,7 +17,7 @@ Current release: `v1.0.5`.
 - [Signed Release Workflow (Paid Team)](#signed-release-workflow-paid-team)
 - [Git Safety Hooks (Per-Clone Setup)](#git-safety-hooks-per-clone-setup)
 - [System Requirements](#system-requirements)
-- [Associate Markdown Files in Finder](#associate-markdown-files-in-finder)
+- [Associate Markdown Files](#associate-markdown-files)
 - [Supported File Extensions](#supported-file-extensions)
 - [Markdown Compatibility](#markdown-compatibility)
 - [Local Rendering and Security Model](#local-rendering-and-security-model)
@@ -30,7 +30,7 @@ Current release: `v1.0.5`.
 
 ## Scope
 
-Quick Markdown Viewer v1 is intentionally minimal:
+Quick Markdown Viewer v1 is intentionally viewer-first:
 - macOS only (Swift + SwiftUI)
 - `WKWebView` rendering surface
 - Bundled local `markdown-it` renderer (no CDN)
@@ -100,8 +100,8 @@ scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY --team-id Y
 This produces:
 - a signed exported app bundle in `dist/export`
 - a notarised ZIP and SHA256 checksum in `dist/release`
-  - `QuickMarkdownViewer-macOS.zip`
-  - `QuickMarkdownViewer-macOS-SHA256.txt`
+  - `QuickMarkdownViewer-v<version>-macOS.zip`
+  - `QuickMarkdownViewer-v<version>-macOS-SHA256.txt`
 
 Full instructions are in [RELEASING.md](RELEASING.md).
 
@@ -186,7 +186,15 @@ If `WKWebView` helper processes crash while debugging, disable debugger launch i
 3. In **Info**, untick **Debug executable**.
 4. Run again with `⌘R`.
 
-## Associate Markdown Files in Finder
+## Associate Markdown Files
+
+From the app:
+
+1. Open Quick Markdown Viewer.
+2. Open Settings (`⌘,`).
+3. In the General pane, choose `Quick Markdown Viewer` as the default Markdown viewer.
+
+From Finder:
 
 1. In Finder, select a `.md` file and press `⌘I`.
 2. In **Open with**, choose `Quick Markdown Viewer`.
@@ -313,7 +321,7 @@ own risk.
   - Symptom: `Flexible Space` may not visibly expand/contract with window width changes in some toolbar layouts.
   - Current status: observed in Quick Markdown Viewer and also in Preview (v11.0 on macOS 26.3.1), suggesting AppKit/system-style behaviour rather than app-specific layout logic.
   - Current workaround: if fixed-width spacing is needed, users can insert multiple `Space` items in toolbar customisation.
-  - Future work: revisit toolbar implementation details (especially grouped-item composition and style interactions) in a dedicated post-v1.0.5 pass.
+  - Future work: revisit toolbar implementation details (especially grouped-item composition and style interactions) in a dedicated future pass.
 - App-menu `Settings…` icon may still appear as generic `gear` on some macOS builds.
   - Symptom: menu shows `gear` even when Quick Markdown Viewer requests `gearshape`.
   - Current status: persists after switching to `SettingsLink` and applying AppKit menu-item icon overrides at launch/activation.

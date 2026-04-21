@@ -1,8 +1,8 @@
 # Quick Markdown Viewer
 
-Quick Markdown Viewer is a simple app for opening Markdown files as clean, rendered documents on macOS.
+Quick Markdown Viewer is a native Markdown viewer for opening Markdown files as clean, rendered documents on macOS.
 
-It is designed for people who just want to read Markdown quickly, without editing tools or setup.
+It is designed to feel like using Mac's Preview app for viewing Markdown documents, without editing tools or setup.
 
 Quick Markdown Viewer is free and open-source. If you find it useful, [optional contributions are greatly appreciated](https://ko-fi.com/naohideyamamoto) and help cover ongoing maintenance costs. Contributions are voluntary and do not change Quick Markdown Viewer’s functionality.
 
@@ -18,7 +18,7 @@ For developer and release details, see [README.developers.md](README.developers.
 - [Quick Start](#quick-start)
 - [Supported File Types](#supported-file-types)
 - [Markdown Compatibility](#markdown-compatibility)
-- [Set as the Default App in Finder](#set-as-the-default-app-in-finder)
+- [Set as the Default App](#set-as-the-default-app)
 - [Full Functionality](#full-functionality)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Licence](#licence)
@@ -33,7 +33,7 @@ For developer and release details, see [README.developers.md](README.developers.
 
 - Quickly opening Markdown files with proper headings, lists, tables, images, and other common Markdown features.
 - Reading Markdown locally on your Mac without uploading documents to a remote rendering service.
-- A lightweight 'Preview for Markdown' workflow on Mac.
+- A native 'Preview for Markdown' workflow on Mac.
 
 ## System Requirements
 
@@ -43,7 +43,7 @@ For developer and release details, see [README.developers.md](README.developers.
 ## Quick Start
 
 1. Go to this repository's **Releases** page.
-2. Download the latest app ZIP (`QuickMarkdownViewer-macOS.zip`).
+2. Download the latest app ZIP (`QuickMarkdownViewer-v<version>-macOS.zip`).
 3. Open the ZIP and drag `Quick Markdown Viewer.app` into `Applications`.
 4. Open the app once.
 5. Open a Markdown file by either:
@@ -71,7 +71,15 @@ Quick Markdown Viewer intentionally does not support:
 
 Quick Markdown Viewer is intended for standard Markdown document rendering. It is not designed to reproduce non-standard or modified Markdown formats. For example, the links to section headings used in the table of contents above, which are supported by GitHub's Markdown processor, do not work on Quick Markdown Viewer.
 
-## Set as the Default App in Finder
+## Set as the Default App
+
+You can set Quick Markdown Viewer as the default Markdown viewer from Settings:
+
+1. Open Quick Markdown Viewer.
+2. Open Settings (`⌘,`).
+3. In the General pane, choose **Quick Markdown Viewer** as the default Markdown viewer.
+
+You can also use Finder:
 
 1. Select a Markdown file in Finder and press `⌘I`.
 2. In **Open with**, choose **Quick Markdown Viewer**.
@@ -82,8 +90,10 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
 - Read-only Markdown viewing (no editing surface).
 - One document per window.
 - Native customisable macOS toolbar with persisted layout/display mode.
-- Native Settings window (`⌘,`) with General and Appearance panes for preferences.
-- Built-in document text controls in Settings:
+- Native Settings window (`⌘,`) with General and Appearance panes:
+  - General: default Markdown viewer, View Source app, update checking, and reset actions
+  - Appearance: appearance mode, background colours, visible background amount, default window size, toolbar size, document style, syntax highlighting, and reset actions
+- Document style controls in Settings:
   - Typeface: `Sans-serif` or `Serif`
   - Density: `Standard` or `Compact`
 - File open from:
@@ -106,6 +116,9 @@ Quick Markdown Viewer is intended for standard Markdown document rendering. It i
   - `Shift+⌘G` previous
   - `⌘E` use selection for find
   - case-insensitive and case-sensitive modes
+- Adaptive toolbar Search:
+  - expands to a normal search field in wide windows
+  - collapses to a magnifying-glass button in narrow windows
 - With the toolbar hidden, `⌘F` opens a compact native find panel with the same query/mode state as toolbar search.
 - Zoom controls:
   - zoom in/out
@@ -178,6 +191,7 @@ You are responsible for reviewing, building, and using the software at your own 
 - File does not open: confirm the file extension is supported.
 - Image is missing: check that the image path is correct relative to the Markdown file location.
 - `.md` opens in another app: set Quick Markdown Viewer as default via `Settings…` or Finder (**Open with > Change All…**).
+- Window opens too large or goes beyond the screen: open Settings (`⌘,`) and reduce the default window size in the Appearance pane.
 
 ## What Quick Markdown Viewer Is Not For
 
