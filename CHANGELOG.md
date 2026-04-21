@@ -39,6 +39,11 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 - Disabled document-only toolbar actions, such as View Source, when no document is open.
 
 ### Changed
+- App version metadata:
+  - `MARKETING_VERSION = 1.1.0`
+  - `CURRENT_PROJECT_VERSION = 7`
+  - `CFBundleShortVersionString = 1.1.0`
+  - `CFBundleVersion = 7`
 - `⌘E` now expands/focuses toolbar Search after successfully using selected text for Find.
 - Removed `⌘J` / Jump to Selection behaviour from the app.
 - Release artefact filenames now include the app version (for example, `QuickMarkdownViewer-v1.1.0-macOS.zip` and `QuickMarkdownViewer-v1.1.0-macOS-SHA256.txt`).
