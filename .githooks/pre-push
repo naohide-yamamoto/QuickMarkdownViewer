@@ -7,7 +7,7 @@ set -euo pipefail
 # another workflow path. We inspect the current tracked project file content and
 # block pushes that contain committed Team metadata.
 
-PROJECT_FILE="QuickMarkdownViewer.xcodeproj/project.pbxproj"
+PROJECT_FILE="Stillic.xcodeproj/project.pbxproj"
 
 if [[ -f "${PROJECT_FILE}" ]]; then
   if grep -Eq '^[[:space:]]*DEVELOPMENT_TEAM[[:space:]]*=' "${PROJECT_FILE}"; then

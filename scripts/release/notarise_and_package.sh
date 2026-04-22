@@ -11,7 +11,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   scripts/release/notarise_and_package.sh \
-    --app-path <path-to-Quick Markdown Viewer.app> \
+    --app-path <path-to-Stillic.app> \
     --keychain-profile <notarytool-profile-name> \
     [--output-dir <directory>]
 USAGE

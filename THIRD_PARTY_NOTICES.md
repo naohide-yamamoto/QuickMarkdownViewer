@@ -1,12 +1,12 @@
 # Third-Party Notices
 
-Quick Markdown Viewer bundles third-party software.
+Stillic bundles third-party software.
 
 ## markdown-it
 
 - Upstream project: https://github.com/markdown-it/markdown-it
 - Version in bundled asset header: 14.1.1
-- Bundled file: `QuickMarkdownViewer/Web/markdown-it.min.js`
+- Bundled file: `Stillic/Web/markdown-it.min.js`
 - Licence: MIT
 
 Copyright (c) 2014 Vitaly Puzrin, Alex Kocharin.
@@ -34,15 +34,15 @@ SOFTWARE.
 - Upstream project: https://github.com/highlightjs/highlight.js
 - Version in bundled asset header: 11.11.1
 - Bundled files:
-  - `QuickMarkdownViewer/Web/highlight.min.js`
-  - `QuickMarkdownViewer/Web/highlight-github.min.css`
-  - `QuickMarkdownViewer/Web/highlight-github-dark.min.css`
-  - `QuickMarkdownViewer/Web/highlight-vs.min.css`
-  - `QuickMarkdownViewer/Web/highlight-vs2015.min.css`
-  - `QuickMarkdownViewer/Web/highlight-atom-one-light.min.css`
-  - `QuickMarkdownViewer/Web/highlight-atom-one-dark.min.css`
-  - `QuickMarkdownViewer/Web/highlight-stackoverflow-light.min.css`
-  - `QuickMarkdownViewer/Web/highlight-stackoverflow-dark.min.css`
+  - `Stillic/Web/highlight.min.js`
+  - `Stillic/Web/highlight-github.min.css`
+  - `Stillic/Web/highlight-github-dark.min.css`
+  - `Stillic/Web/highlight-vs.min.css`
+  - `Stillic/Web/highlight-vs2015.min.css`
+  - `Stillic/Web/highlight-atom-one-light.min.css`
+  - `Stillic/Web/highlight-atom-one-dark.min.css`
+  - `Stillic/Web/highlight-stackoverflow-light.min.css`
+  - `Stillic/Web/highlight-stackoverflow-dark.min.css`
 - Licence: BSD-3-Clause
 
 Copyright (c) 2006, Ivan Sagalaev.

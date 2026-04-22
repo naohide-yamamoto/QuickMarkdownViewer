@@ -1,6 +1,6 @@
 # Trade marks and Branding
 
-Quick Markdown Viewer, the Quick Markdown Viewer app icon, and related project
+Stillic, the Stillic app icon, and related project
 branding are branding assets of Naohide Yamamoto.
 
 ## What the Apache License Covers
@@ -12,8 +12,8 @@ That licence applies to the code unless otherwise noted.
 
 ## What the Apache License Does Not Cover
 
-The Apache License, Version 2.0 does not grant permission to use the Quick
-Markdown Viewer name, app icon, logo, or other branding except as required for
+The Apache License, Version 2.0 does not grant permission to use the Stillic
+name, app icon, logo, or other branding except as required for
 reasonable and customary use in describing the origin of the work and
 reproducing the content of the NOTICE file.
 
@@ -22,7 +22,7 @@ reproducing the content of the NOTICE file.
 You may:
 
 - refer to this project by name when accurately describing it
-- say that your work is 'based on Quick Markdown Viewer' or 'forked from Quick Markdown Viewer'
+- say that your work is 'based on Stillic' or 'forked from Stillic'
 - link to the original project and its releases
 
 ## Uses That Require Renaming
@@ -35,12 +35,12 @@ This rule exists to avoid confusion about which builds are official.
 
 ## No Implied Endorsement
 
-You may not use the Quick Markdown Viewer name, icon, or branding in a way that
+You may not use the Stillic name, icon, or branding in a way that
 suggests that Naohide Yamamoto endorses, sponsors, certifies, or is otherwise
 responsible for your fork, build, or distribution.
 
 ## Official Builds
 
 Official public builds are only those released by Naohide Yamamoto through the
-official Quick Markdown Viewer repository and its published release channels,
+official Stillic repository and its published release channels,
 and signed/notarised by Naohide Yamamoto.

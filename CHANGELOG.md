@@ -1,8 +1,20 @@
 # Changelog
 
-All notable changes to Quick Markdown Viewer are tracked in this file from `v1.0.4` onwards.
+All notable changes to Stillic are tracked in this file from `v1.0.4` onwards.
 
 This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning.
+
+## [1.1.1] - 2026-04-22
+
+### Changed
+- Renamed Quick Markdown Viewer to Stillic.
+- Updated app bundle identity, release artifact names, documentation, website links, and support contact details.
+- Changed the bundle identifier to `com.naohideyamamoto.stillic`.
+- Updated app version metadata:
+  - `MARKETING_VERSION = 1.1.1`
+  - `CURRENT_PROJECT_VERSION = 8`
+  - `CFBundleShortVersionString = 1.1.1`
+  - `CFBundleVersion = 8`
 
 ## [1.1.0] - 2026-04-21
 
