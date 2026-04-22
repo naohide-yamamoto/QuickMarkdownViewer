@@ -20,7 +20,7 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 
 ### Added
 - Native Settings window (`⌘,`) with General and Appearance panes.
-- App-menu `Check for Updates…` command under `Stillic`, with native result dialogs.
+- App-menu `Check for Updates…` command under `Quick Markdown Viewer`, with native result dialogs.
 - Optional automatic update checking (off by default) that checks GitHub for newer releases without downloading updates automatically.
 - Default Markdown viewer selector in Settings.
 - Configurable `View source with` setting in `Settings > General`:
@@ -58,7 +58,7 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
   - `CFBundleVersion = 7`
 - `⌘E` now expands/focuses toolbar Search after successfully using selected text for Find.
 - Removed `⌘J` / Jump to Selection behaviour from the app.
-- Release artefact filenames now include the app version (for example, `Stillic-v1.1.0-macOS.zip` and `Stillic-v1.1.0-macOS-SHA256.txt`).
+- Release artefact filenames now include the app version (for example, `QuickMarkdownViewer-v1.1.0-macOS.zip` and `QuickMarkdownViewer-v1.1.0-macOS-SHA256.txt`).
 - Local rendering documentation now covers bundled `highlight.js` alongside `markdown-it`.
 - Third-party notices now include bundled `highlight.js` and bundled syntax theme CSS files.
 
@@ -93,7 +93,7 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 ## [1.0.4] - 2026-03-30
 
 ### Added
-- Initial public release of Stillic.
+- Initial public release of Quick Markdown Viewer.
 
 ### Changed
 - App version metadata:
