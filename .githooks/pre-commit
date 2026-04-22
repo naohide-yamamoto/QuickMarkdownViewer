@@ -12,7 +12,7 @@ set -euo pipefail
 # 1) known local build artefacts, or
 # 2) newly-added Team/provisioning lines in project.pbxproj.
 
-PROJECT_FILE="QuickMarkdownViewer.xcodeproj/project.pbxproj"
+PROJECT_FILE="Stillic.xcodeproj/project.pbxproj"
 
 staged_files="$(git diff --cached --name-only --diff-filter=ACMR)"
 

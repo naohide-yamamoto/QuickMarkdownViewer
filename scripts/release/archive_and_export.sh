@@ -10,10 +10,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-PROJECT_PATH="${PROJECT_PATH:-${ROOT_DIR}/QuickMarkdownViewer.xcodeproj}"
-SCHEME="${SCHEME:-QuickMarkdownViewer}"
+PROJECT_PATH="${PROJECT_PATH:-${ROOT_DIR}/Stillic.xcodeproj}"
+SCHEME="${SCHEME:-Stillic}"
 CONFIGURATION="${CONFIGURATION:-Release}"
-ARCHIVE_PATH="${ARCHIVE_PATH:-${ROOT_DIR}/dist/QuickMarkdownViewer.xcarchive}"
+ARCHIVE_PATH="${ARCHIVE_PATH:-${ROOT_DIR}/dist/Stillic.xcarchive}"
 EXPORT_PATH="${EXPORT_PATH:-${ROOT_DIR}/dist/export}"
 
 if ! command -v xcodebuild >/dev/null 2>&1; then
@@ -44,7 +44,7 @@ if [[ -z "${TEAM_ID}" ]]; then
 fi
 
 # Create export options dynamically so team identifiers are never committed.
-TMP_EXPORT_OPTIONS="$(mktemp "${TMPDIR:-/tmp}/qmv-export-options.XXXXXX.plist")"
+TMP_EXPORT_OPTIONS="$(mktemp "${TMPDIR:-/tmp}/stillic-export-options.XXXXXX.plist")"
 cleanup() {
   rm -f "${TMP_EXPORT_OPTIONS}"
 }

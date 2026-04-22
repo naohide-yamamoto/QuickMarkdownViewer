@@ -1,13 +1,13 @@
-# Quick Markdown Viewer
+# Stillic
 
-Quick Markdown Viewer is a native Markdown viewer for macOS.
+Stillic is a native Markdown viewer for macOS.
 
 It is designed to feel like Preview for Markdown:
 - Double-click a Markdown file
 - Open immediately in a rendered document window
 - No source pane and no editing UI
 
-Current release: `v1.1.0`.
+Current release: `v1.1.1`.
 
 ## Contents
 
@@ -30,7 +30,7 @@ Current release: `v1.1.0`.
 
 ## Scope
 
-Quick Markdown Viewer v1 is intentionally viewer-first:
+Stillic v1 is intentionally viewer-first:
 - macOS only (Swift + SwiftUI)
 - `WKWebView` rendering surface
 - Bundled local `markdown-it` renderer (no CDN)
@@ -54,7 +54,7 @@ Quick Markdown Viewer v1 is intentionally viewer-first:
 
 ## Non-goals
 
-Quick Markdown Viewer is **not**:
+Stillic is **not**:
 - a Markdown editor
 - a split-view preview editor
 - a notes app or knowledge base
@@ -65,8 +65,8 @@ No live preview, plugin system, command palette, or sync features are included.
 
 ## Build and Run
 
-1. Open [QuickMarkdownViewer.xcodeproj](QuickMarkdownViewer.xcodeproj) in Xcode (current technical project filename).
-2. Select the current `QuickMarkdownViewer` scheme (current technical scheme name).
+1. Open [Stillic.xcodeproj](Stillic.xcodeproj) in Xcode (current technical project filename).
+2. Select the current `Stillic` scheme (current technical scheme name).
 3. Choose **My Mac** as the macOS target.
 4. Build and run (`⌘R`).
 
@@ -87,21 +87,21 @@ Manual local-only steps (kept out of Git for security):
 Scripted release path:
 
 ```bash
-scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
+scripts/release/make_signed_release.sh --keychain-profile STILLIC_NOTARY
 ```
 
 If local Team auto-resolution does not work on your machine, rerun with an
 explicit Team override:
 
 ```bash
-scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY --team-id YOUR_TEAM_ID
+scripts/release/make_signed_release.sh --keychain-profile STILLIC_NOTARY --team-id YOUR_TEAM_ID
 ```
 
 This produces:
 - a signed exported app bundle in `dist/export`
 - a notarised ZIP and SHA256 checksum in `dist/release`
-  - `QuickMarkdownViewer-v<version>-macOS.zip`
-  - `QuickMarkdownViewer-v<version>-macOS-SHA256.txt`
+  - `Stillic-v<version>-macOS.zip`
+  - `Stillic-v<version>-macOS-SHA256.txt`
 
 Full instructions are in [RELEASING.md](RELEASING.md).
 
@@ -136,7 +136,7 @@ Expected output:
 What the hooks enforce:
 - `pre-commit` blocks staged local build/export artefacts (`dist/*`, `*.xcarchive*`).
 - `pre-commit` blocks newly added `DEVELOPMENT_TEAM` or provisioning profile
-  lines in `QuickMarkdownViewer.xcodeproj/project.pbxproj`.
+  lines in `Stillic.xcodeproj/project.pbxproj`.
 - `pre-push` blocks pushes if `project.pbxproj` contains committed
   `DEVELOPMENT_TEAM` metadata.
 - `pre-push` blocks pushes if `dist/` is tracked in Git.
@@ -149,7 +149,7 @@ Working rules:
 
 ## System Requirements
 
-This section is maintained as Quick Markdown Viewer evolves, and should be reviewed at each release.
+This section is maintained as Stillic evolves, and should be reviewed at each release.
 
 ### Minimum
 
@@ -168,8 +168,8 @@ This section is maintained as Quick Markdown Viewer evolves, and should be revie
 
 - Runtime rendering stack:
   - `WKWebView` (system WebKit on macOS).
-  - Bundled local `markdown-it` (`QuickMarkdownViewer/Web/markdown-it.min.js`, current technical source path).
-  - Bundled local `highlight.js` (`QuickMarkdownViewer/Web/highlight.min.js`) for optional fenced-code syntax highlighting.
+  - Bundled local `markdown-it` (`Stillic/Web/markdown-it.min.js`, current technical source path).
+  - Bundled local `highlight.js` (`Stillic/Web/highlight.min.js`) for optional fenced-code syntax highlighting.
   - Bundled local renderer/template assets (`index.html`, `renderer.js`, `styles.css`).
 - Build dependency:
   - Xcode (for local build/run from source).
@@ -190,20 +190,20 @@ If `WKWebView` helper processes crash while debugging, disable debugger launch i
 
 From the app:
 
-1. Open Quick Markdown Viewer.
+1. Open Stillic.
 2. Open Settings (`⌘,`).
-3. In the General pane, choose `Quick Markdown Viewer` as the default Markdown viewer.
+3. In the General pane, choose `Stillic` as the default Markdown viewer.
 
 From Finder:
 
 1. In Finder, select a `.md` file and press `⌘I`.
-2. In **Open with**, choose `Quick Markdown Viewer`.
+2. In **Open with**, choose `Stillic`.
 3. Click **Change All…** to make it default for that extension.
 4. Repeat for `.markdown`, `.mdown`, `.mkd`, `.mkdn`, or `.mdwn` if needed.
 
 ## Supported File Extensions
 
-Quick Markdown Viewer currently accepts:
+Stillic currently accepts:
 - `.md`
 - `.markdown`
 - `.mdown`
@@ -211,9 +211,9 @@ Quick Markdown Viewer currently accepts:
 - `.mkdn`
 - `.mdwn`
 
-Selecting Quick Markdown Viewer as the default Markdown viewer in Settings (`⌘,`) updates the Launch Services handler for the primary Markdown content type. On current macOS builds, this is confirmed once and applied to grouped Markdown extensions (observed: `.md` and `.markdown`).
+Selecting Stillic as the default Markdown viewer in Settings (`⌘,`) updates the Launch Services handler for the primary Markdown content type. On current macOS builds, this is confirmed once and applied to grouped Markdown extensions (observed: `.md` and `.markdown`).
 
-Quick Markdown Viewer intentionally does **not** support:
+Stillic intentionally does **not** support:
 - `.rmd`
 - `.qmd`
 
@@ -223,15 +223,15 @@ Unsupported-file warning behaviour:
 
 ## Markdown Compatibility
 
-Quick Markdown Viewer aims for standard document-style Markdown rendering via
+Stillic aims for standard document-style Markdown rendering via
 the bundled `markdown-it` pipeline. More specifically, the rendering target is
 the CommonMark-oriented behaviour provided by `markdown-it`, together with the
-small set of enabled features and local handling rules used by this app. Quick
-Markdown Viewer is not intended to reproduce non-standard or modified Markdown
+small set of enabled features and local handling rules used by this app. Stillic
+is not intended to reproduce non-standard or modified Markdown
 formats, platform-specific rendering rules, or special README-style
 conveniences. The within-document table-of-contents links in [README.md](README.md)
 and [README.developers.md](README.developers.md) are examples of behaviour that
-may work on a hosting platform without being a Quick Markdown Viewer
+may work on a hosting platform without being a Stillic
 compatibility target.
 
 Fenced-code syntax highlighting is optional: when enabled in
@@ -244,7 +244,7 @@ remains print-friendly regardless of the active app appearance mode.
 
 ## Local Rendering and Security Model
 
-Quick Markdown Viewer uses a local rendering pipeline. Markdown source is
+Stillic uses a local rendering pipeline. Markdown source is
 converted into an app-controlled HTML document using bundled `markdown-it`,
 bundled `highlight.js` (optional), bundled CSS, and bundled renderer
 JavaScript, then loaded into `WKWebView`.
@@ -260,22 +260,22 @@ passthrough from Markdown input is disabled in the renderer configuration.
 
 External `http`, `https`, and `mailto` links are opened only when the user
 explicitly clicks them, at which point they are handed off to the system
-browser or mail app rather than rendered inside Quick Markdown Viewer.
+browser or mail app rather than rendered inside Stillic.
 
 Update checks follow the same opt-in principle:
 - `Check for Updates…` performs a user-initiated request to GitHub for release metadata.
 - Automatic update checking is off by default.
-- If users enable automatic checking in Settings, Quick Markdown Viewer contacts GitHub only to fetch release metadata and does not download/install updates automatically.
+- If users enable automatic checking in Settings, Stillic contacts GitHub only to fetch release metadata and does not download/install updates automatically.
 
 ## Licence
 
-Quick Markdown Viewer source code is licensed under the Apache License,
+Stillic source code is licensed under the Apache License,
 Version 2.0.
 
 See [LICENSE](LICENSE) for the full licence text.
 Project attribution details are provided in [NOTICE](NOTICE).
 
-The Quick Markdown Viewer name, app icon, and related branding are not
+The Stillic name, app icon, and related branding are not
 licensed under Apache-2.0. See [TRADEMARKS.md](TRADEMARKS.md).
 
 Bundled third-party software notices are provided in
@@ -283,25 +283,25 @@ Bundled third-party software notices are provided in
 
 ## Official Builds and Forks
 
-Quick Markdown Viewer is open-source software. You are welcome to read the
+Stillic is open-source software. You are welcome to read the
 code, build it, fork it, and modify it under the terms of the Apache License,
 Version 2.0.
 
 Official public builds are only those released by Naohide Yamamoto through this
 repository's Releases page and signed/notarised by Naohide Yamamoto.
 
-If you obtain Quick Markdown Viewer from another source, or from a fork, treat
+If you obtain Stillic from another source, or from a fork, treat
 that build as unofficial unless it is clearly identified as an official
 release from this repository and carries the expected signing/notarisation
 status.
 
 If you redistribute a modified build, please rename the app and replace the
 icon and related branding unless you have explicit permission to use the
-official Quick Markdown Viewer branding.
+official Stillic branding.
 
 ## No Warranty
 
-Quick Markdown Viewer is provided under the Apache License, Version 2.0 on an
+Stillic is provided under the Apache License, Version 2.0 on an
 'AS IS' basis, without warranties or conditions of any kind.
 
 You are responsible for reviewing, building, and using the software at your
@@ -310,7 +310,7 @@ own risk.
 ## Known Issues
 
 - Native macOS Help Viewer integration is currently unreliable on some systems.
-  - Symptom: selecting `Help > Quick Markdown Viewer Help` can show 'The selected content is currently unavailable'.
+  - Symptom: selecting `Help > Stillic Help` can show 'The selected content is currently unavailable'.
   - Current status: Help-book registration and anchor-dispatch logs can still report success while Help Viewer fails to render content.
   - Current workaround implemented in-app: the Help menu command opens bundled in-app Help content directly.
   - Future work: revisit Apple Help Book rendering path and restore reliable native Help Viewer page loading.
@@ -319,15 +319,15 @@ own risk.
   - Current status: this issue persists after multiple AppKit-side adjustments (`toggleToolbarShown`, item-group tuning, and toolbar item navigation flags).
   - Current workaround: users can still remove/rearrange toolbar items via `View > Customise Toolbar…`.
   - Symptom: `Flexible Space` may not visibly expand/contract with window width changes in some toolbar layouts.
-  - Current status: observed in Quick Markdown Viewer and also in Preview (v11.0 on macOS 26.3.1), suggesting AppKit/system-style behaviour rather than app-specific layout logic.
+  - Current status: observed in Stillic and also in Preview (v11.0 on macOS 26.3.1), suggesting AppKit/system-style behaviour rather than app-specific layout logic.
   - Current workaround: if fixed-width spacing is needed, users can insert multiple `Space` items in toolbar customisation.
   - Future work: revisit toolbar implementation details (especially grouped-item composition and style interactions) in a dedicated future pass.
 - App-menu `Settings…` icon may still appear as generic `gear` on some macOS builds.
-  - Symptom: menu shows `gear` even when Quick Markdown Viewer requests `gearshape`.
+  - Symptom: menu shows `gear` even when Stillic requests `gearshape`.
   - Current status: persists after switching to `SettingsLink` and applying AppKit menu-item icon overrides at launch/activation.
   - Current workaround: functional impact is none (menu action and shortcut still work); this is visual-only.
 - Markdown default-app association UI can lag when changed externally.
-  - Symptom: with Quick Markdown Viewer Settings already open, changing `.md` association in Finder `Get Info` may not immediately refresh the picker; likewise, with Finder `Get Info` already open, changing association in Quick Markdown Viewer may not immediately refresh Finder's displayed app.
+  - Symptom: with Stillic Settings already open, changing `.md` association in Finder `Get Info` may not immediately refresh the picker; likewise, with Finder `Get Info` already open, changing association in Stillic may not immediately refresh Finder's displayed app.
   - Current status: actual Launch Services association is updated correctly, but already-open UI panels can display stale values until refreshed/reopened.
   - Current workaround: close/reopen the affected pane/window to refresh displayed association state.
   - Assessment: treated as a macOS/Launch Services UI refresh boundary, not an app-specific association-write failure.
@@ -335,7 +335,7 @@ own risk.
 ## Notes
 
 - External links (`http`, `https`, `mailto`) open in default apps.
-- Local Markdown links open in a new Quick Markdown Viewer window.
+- Local Markdown links open in a new Stillic window.
 - Relative image links resolve from the opened document's folder.
 - File commands:
   - `⌘O` opens a Markdown file.
@@ -344,7 +344,7 @@ own risk.
   - `⌘P` prints rendered Markdown content.
   - `File > Export as PDF…` exports rendered Markdown content as PDF.
   - `File > View Source` opens the raw `.md` in the app selected in `Settings > General > View source with` (with fallback to the system default text editor if the selected app is unavailable).
-  - `Quick Markdown Viewer > Check for Updates…` checks GitHub release metadata.
+  - `Stillic > Check for Updates…` checks GitHub release metadata.
 - Settings commands:
   - `⌘,` opens the Settings window.
   - `General` pane controls default Markdown viewer, View Source app selection, manual/automatic update-check preferences, and reset actions.
@@ -372,7 +372,7 @@ own risk.
 - Toolbar commands:
   - `⌥⌘T` toggles toolbar visibility.
   - `View > Customise Toolbar…` opens native drag/drop toolbar customisation.
-- In sandboxed Release builds, Quick Markdown Viewer may ask once for folder access when a document contains local relative image/link paths and macOS did not grant sibling-file scope from the initial file selection; granted folders are remembered via security-scoped bookmarks.
+- In sandboxed Release builds, Stillic may ask once for folder access when a document contains local relative image/link paths and macOS did not grant sibling-file scope from the initial file selection; granted folders are remembered via security-scoped bookmarks.
 - Markdown rendering behaviour is designed for reading, not editing.
 
 ## Signed Release Readiness Checklist
@@ -381,17 +381,17 @@ own risk.
 2. Confirm Release uses:
    - App Sandbox enabled
    - Hardened Runtime enabled
-   - `QuickMarkdownViewer/Resources/QuickMarkdownViewer.entitlements` (current technical path)
+   - `Stillic/Resources/Stillic.entitlements` (current technical path)
 3. Create your local notarytool keychain profile (do not commit credentials).
 4. If `README.md` changed, update the Help Book HTML copy and regenerate the Help index:
    - Update:
-     - `QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/en.lproj/index.html`
-     - `QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/index.html`
+     - `Stillic/Resources/Help/StillicHelp.help/Contents/Resources/en.lproj/index.html`
+     - `Stillic/Resources/Help/StillicHelp.help/Contents/Resources/index.html`
      so both copies mirror `README.md`.
    - Run:
-     - `hiutil -Caf QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/QuickMarkdownViewerHelp.helpindex QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources`
+     - `hiutil -Caf Stillic/Resources/Help/StillicHelp.help/Contents/Resources/StillicHelp.helpindex Stillic/Resources/Help/StillicHelp.help/Contents/Resources`
 5. Run:
-   - `scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY`
+   - `scripts/release/make_signed_release.sh --keychain-profile STILLIC_NOTARY`
 6. Upload the generated ZIP and SHA256 files from `dist/release` to GitHub Releases.
 
 See [RELEASING.md](RELEASING.md) for the full maintained process.

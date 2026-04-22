@@ -1,14 +1,26 @@
 # Changelog
 
-All notable changes to Quick Markdown Viewer are tracked in this file from `v1.0.4` onwards.
+All notable changes to Stillic are tracked in this file from `v1.0.4` onwards.
 
 This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning.
+
+## [1.1.1] - 2026-04-22
+
+### Changed
+- Renamed Quick Markdown Viewer to Stillic.
+- Updated app bundle identity, release artifact names, documentation, website links, and support contact details.
+- Changed the bundle identifier to `com.naohideyamamoto.stillic`.
+- Updated app version metadata:
+  - `MARKETING_VERSION = 1.1.1`
+  - `CURRENT_PROJECT_VERSION = 8`
+  - `CFBundleShortVersionString = 1.1.1`
+  - `CFBundleVersion = 8`
 
 ## [1.1.0] - 2026-04-21
 
 ### Added
 - Native Settings window (`⌘,`) with General and Appearance panes.
-- App-menu `Check for Updates…` command under `Quick Markdown Viewer`, with native result dialogs.
+- App-menu `Check for Updates…` command under `Stillic`, with native result dialogs.
 - Optional automatic update checking (off by default) that checks GitHub for newer releases without downloading updates automatically.
 - Default Markdown viewer selector in Settings.
 - Configurable `View source with` setting in `Settings > General`:
@@ -46,7 +58,7 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
   - `CFBundleVersion = 7`
 - `⌘E` now expands/focuses toolbar Search after successfully using selected text for Find.
 - Removed `⌘J` / Jump to Selection behaviour from the app.
-- Release artefact filenames now include the app version (for example, `QuickMarkdownViewer-v1.1.0-macOS.zip` and `QuickMarkdownViewer-v1.1.0-macOS-SHA256.txt`).
+- Release artefact filenames now include the app version (for example, `Stillic-v1.1.0-macOS.zip` and `Stillic-v1.1.0-macOS-SHA256.txt`).
 - Local rendering documentation now covers bundled `highlight.js` alongside `markdown-it`.
 - Third-party notices now include bundled `highlight.js` and bundled syntax theme CSS files.
 
@@ -81,7 +93,7 @@ This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.
 ## [1.0.4] - 2026-03-30
 
 ### Added
-- Initial public release of Quick Markdown Viewer.
+- Initial public release of Stillic.
 
 ### Changed
 - App version metadata:

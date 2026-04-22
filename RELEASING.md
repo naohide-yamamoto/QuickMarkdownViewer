@@ -1,4 +1,4 @@
-# Releasing Quick Markdown Viewer (Signed + Notarised)
+# Releasing Stillic (Signed + Notarised)
 
 This guide is for maintainers creating a public macOS release that follows the normal Gatekeeper trust flow (Developer ID signing + Apple notarisation).
 
@@ -8,8 +8,8 @@ Sensitive setup stays local by design. The repository does **not** store Team cr
 
 ### 1.1 Configure your Team in Xcode
 
-1. Open `QuickMarkdownViewer.xcodeproj` in Xcode.
-2. Select target **QuickMarkdownViewer**.
+1. Open `Stillic.xcodeproj` in Xcode.
+2. Select target **Stillic**.
 3. Open **Signing & Capabilities**.
 4. Under **Release**, choose your paid Apple Developer Team.
 5. Keep signing **Automatic**.
@@ -21,13 +21,13 @@ This step is intentionally manual so your local account context never needs to b
 Run this once on your Mac (replace placeholders):
 
 ```bash
-xcrun notarytool store-credentials "QMV_NOTARY" \
+xcrun notarytool store-credentials "STILLIC_NOTARY" \
   --apple-id "your-apple-id@example.com" \
   --team-id "YOUR_TEAM_ID" \
   --password "app-specific-password"
 ```
 
-You can then reuse `QMV_NOTARY` for release commands. Credentials are stored in your local keychain.
+You can then reuse `STILLIC_NOTARY` for release commands. Credentials are stored in your local keychain.
 
 ### 1.3 Enable local Git safety hooks
 
@@ -55,14 +55,14 @@ Before building or tagging a release:
    - `README.developers.md`
    - app version metadata (`MARKETING_VERSION`, `CURRENT_PROJECT_VERSION`; these feed `CFBundleShortVersionString` and `CFBundleVersion`)
 2. If `README.md` changed, refresh the bundled Help Book copy:
-   - `QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/en.lproj/index.html`
-   - `QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/index.html`
+   - `Stillic/Resources/Help/StillicHelp.help/Contents/Resources/en.lproj/index.html`
+   - `Stillic/Resources/Help/StillicHelp.help/Contents/Resources/index.html`
 3. Regenerate the Help index:
 
 ```bash
 hiutil -Caf \
-  QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources/QuickMarkdownViewerHelp.helpindex \
-  QuickMarkdownViewer/Resources/Help/QuickMarkdownViewerHelp.help/Contents/Resources
+  Stillic/Resources/Help/StillicHelp.help/Contents/Resources/StillicHelp.helpindex \
+  Stillic/Resources/Help/StillicHelp.help/Contents/Resources
 ```
 
 If `README.md` did not change, you can skip steps 2 and 3.
@@ -77,14 +77,14 @@ This ensures the tagged source matches the released app content, including bundl
 From repo root, after the final release-content commit and tag preparation:
 
 ```bash
-scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
+scripts/release/make_signed_release.sh --keychain-profile STILLIC_NOTARY
 ```
 
 Optional Team override if you need it:
 
 ```bash
 scripts/release/make_signed_release.sh \
-  --keychain-profile QMV_NOTARY \
+  --keychain-profile STILLIC_NOTARY \
   --team-id YOUR_TEAM_ID
 ```
 
@@ -92,7 +92,7 @@ Equivalent environment-variable form:
 
 ```bash
 TEAM_ID=YOUR_TEAM_ID \
-scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
+scripts/release/make_signed_release.sh --keychain-profile STILLIC_NOTARY
 ```
 
 ## 4. What the scripts do
@@ -113,16 +113,16 @@ scripts/release/make_signed_release.sh --keychain-profile QMV_NOTARY
 
 After a successful run:
 
-- `dist/export/Quick Markdown Viewer.app`
-- `dist/release/QuickMarkdownViewer-v<version>-macOS.zip`
-- `dist/release/QuickMarkdownViewer-v<version>-macOS-SHA256.txt`
+- `dist/export/Stillic.app`
+- `dist/release/Stillic-v<version>-macOS.zip`
+- `dist/release/Stillic-v<version>-macOS-SHA256.txt`
 
 ## 6. GitHub release upload checklist
 
 1. Create a new GitHub Release for the version tag.
 2. Upload:
-   - `QuickMarkdownViewer-v<version>-macOS.zip`
-   - `QuickMarkdownViewer-v<version>-macOS-SHA256.txt`
+   - `Stillic-v<version>-macOS.zip`
+   - `Stillic-v<version>-macOS-SHA256.txt`
 3. In release notes, state that this build is officially signed and notarised.
 
 ## 7. Troubleshooting
@@ -132,5 +132,5 @@ After a successful run:
   - If local Team auto-resolution is unavailable, rerun the release command with `--team-id YOUR_TEAM_ID` or `TEAM_ID=YOUR_TEAM_ID`.
   - Ensure your Apple Developer membership is active.
 - If notarisation fails:
-  - Recheck local keychain profile (`xcrun notarytool history --keychain-profile QMV_NOTARY`).
+  - Recheck local keychain profile (`xcrun notarytool history --keychain-profile STILLIC_NOTARY`).
   - Confirm the app bundle identifier and signing identity are consistent.
