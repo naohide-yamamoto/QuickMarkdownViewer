@@ -1688,15 +1688,20 @@ struct MarkdownWebView: NSViewRepresentable {
         // Avoid redundant reloads when neither path nor content changed.
         let fingerprint = "\(baseURL.path)|\(html.hashValue)"
         if context.coordinator.lastLoadedFingerprint != fingerprint {
+            let shouldPreserveScrollPosition =
+                context.coordinator.shouldPreserveScrollPositionWhenLoading(
+                    documentURL: documentURL
+                )
             context.coordinator.lastLoadedFingerprint = fingerprint
-            context.coordinator.shouldApplyInitialZoomToFitOnNextDidFinish = true
-            context.coordinator.prepareForLoadTransition(on: webView)
-            context.coordinator.lastHTMLLoadStartedAt = DispatchTime.now()
-            Logger.info(
-                "[PERF] webview-load-start file=\(documentURL.lastPathComponent) htmlBytes=\(html.utf8.count)"
+            context.coordinator.lastLoadedDocumentURL = documentURL.standardizedFileURL
+            context.coordinator.loadHTMLString(
+                html,
+                baseURL: baseURL,
+                documentURL: documentURL,
+                in: webView,
+                preservingScrollPosition: shouldPreserveScrollPosition,
+                searchBridge: searchBridge
             )
-            searchBridge.invalidateZoomToFitCache()
-            webView.loadHTMLString(html, baseURL: baseURL)
         }
 
         // Apply window-background settings without forcing a reload so slider
@@ -1745,6 +1750,9 @@ struct MarkdownWebView: NSViewRepresentable {
 
         /// Fingerprint of last loaded HTML to avoid unnecessary reloads.
         var lastLoadedFingerprint = ""
+
+        /// Document URL associated with the last requested HTML load.
+        var lastLoadedDocumentURL: URL?
 
         /// Start timestamp for the most recent `loadHTMLString` call.
         var lastHTMLLoadStartedAt: DispatchTime?
@@ -1806,8 +1814,21 @@ struct MarkdownWebView: NSViewRepresentable {
         /// work during rapid drag events.
         private let resizeRefitDebounceSeconds: TimeInterval = 0.01
 
+        /// Incremented for each HTML load request so async scroll snapshots
+        /// cannot start stale loads after newer content arrives.
+        private var htmlLoadSequence: UInt = 0
+
+        /// One-shot scroll position to restore after a same-document reload.
+        private var pendingScrollRestoration: ScrollRestoration?
+
         /// Link router that decides whether to allow or cancel navigation.
         private let linkRoutingService = LinkRoutingService()
+
+        /// Scroll snapshot captured before replacing a same-document page.
+        private struct ScrollRestoration {
+            let x: Double
+            let y: Double
+        }
 
         deinit {
             if let zoomEventMonitor {
@@ -1924,6 +1945,106 @@ struct MarkdownWebView: NSViewRepresentable {
             observedWebViewForSizeChanges = nil
         }
 
+        /// Returns true when a changed HTML payload belongs to the same source
+        /// file and should keep the reader's current viewport after reload.
+        func shouldPreserveScrollPositionWhenLoading(documentURL: URL) -> Bool {
+            guard let lastLoadedDocumentURL else {
+                return false
+            }
+
+            return lastLoadedDocumentURL.standardizedFileURL.path ==
+                documentURL.standardizedFileURL.path
+        }
+
+        /// Starts an HTML load, optionally preserving the current scroll point.
+        func loadHTMLString(
+            _ html: String,
+            baseURL: URL,
+            documentURL: URL,
+            in webView: WKWebView,
+            preservingScrollPosition: Bool,
+            searchBridge: MarkdownWebViewSearchBridge
+        ) {
+            htmlLoadSequence &+= 1
+            let loadSequence = htmlLoadSequence
+
+            let startLoad: (ScrollRestoration?) -> Void = { [weak self, weak webView] restoration in
+                guard let self, let webView else {
+                    return
+                }
+
+                guard self.htmlLoadSequence == loadSequence else {
+                    return
+                }
+
+                self.pendingScrollRestoration = restoration
+                self.shouldApplyInitialZoomToFitOnNextDidFinish = true
+                self.prepareForLoadTransition(on: webView)
+                self.lastHTMLLoadStartedAt = DispatchTime.now()
+                Logger.info(
+                    "[PERF] webview-load-start file=\(documentURL.lastPathComponent) htmlBytes=\(html.utf8.count)"
+                )
+                searchBridge.invalidateZoomToFitCache()
+                webView.loadHTMLString(html, baseURL: baseURL)
+            }
+
+            guard preservingScrollPosition else {
+                pendingScrollRestoration = nil
+                startLoad(nil)
+                return
+            }
+
+            captureScrollRestoration(on: webView) { restoration in
+                startLoad(restoration)
+            }
+        }
+
+        /// Reads the current JavaScript scroll offset before a page reload.
+        private func captureScrollRestoration(
+            on webView: WKWebView,
+            completion: @escaping (ScrollRestoration?) -> Void
+        ) {
+            let script = """
+            (() => {
+                return {
+                    x: window.scrollX || window.pageXOffset || 0,
+                    y: window.scrollY || window.pageYOffset || 0
+                };
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { [weak self] result, error in
+                if let error {
+                    Logger.error("Capturing scroll position before reload failed: \(error.localizedDescription)")
+                    completion(nil)
+                    return
+                }
+
+                guard let self,
+                      let payload = result as? [String: Any],
+                      let x = self.doubleValue(fromJavaScript: payload["x"]),
+                      let y = self.doubleValue(fromJavaScript: payload["y"]) else {
+                    completion(nil)
+                    return
+                }
+
+                completion(ScrollRestoration(x: max(0, x), y: max(0, y)))
+            }
+        }
+
+        /// Converts JavaScript numeric values into Swift `Double`.
+        private func doubleValue(fromJavaScript value: Any?) -> Double? {
+            if let number = value as? NSNumber {
+                return number.doubleValue
+            }
+
+            if let double = value as? Double {
+                return double
+            }
+
+            return nil
+        }
+
         /// Handles one macOS magnify event and applies it to `pageZoom`.
         ///
         /// `NSEvent.magnification` is a zoom delta that should be added to the
@@ -2032,6 +2153,7 @@ struct MarkdownWebView: NSViewRepresentable {
             applyDocumentDensityPreferenceIfNeeded(on: webView, force: true)
 
             guard shouldApplyInitialZoomToFitOnNextDidFinish else {
+                restorePendingScrollPositionAfterLoadIfNeeded(on: webView)
                 return
             }
 
@@ -2043,6 +2165,7 @@ struct MarkdownWebView: NSViewRepresentable {
                     Logger.info(
                         "[PERF] initial-fit file=\(self.currentDocumentURL?.lastPathComponent ?? "unknown") success=true ms=\(self.formatMilliseconds(fitMilliseconds))"
                     )
+                    self.restorePendingScrollPositionAfterLoadIfNeeded(on: webView)
                     return
                 }
 
@@ -2054,6 +2177,61 @@ struct MarkdownWebView: NSViewRepresentable {
                     if !success {
                         Logger.error("Initial zoom-to-fit after document load failed.")
                     }
+                    self.restorePendingScrollPositionAfterLoadIfNeeded(on: webView)
+                }
+            }
+        }
+
+        /// Restores the saved viewport after WebKit replaces same-document HTML.
+        private func restorePendingScrollPositionAfterLoadIfNeeded(on webView: WKWebView) {
+            guard let restoration = pendingScrollRestoration else {
+                return
+            }
+
+            pendingScrollRestoration = nil
+            let xLiteral = String(format: "%.4f", restoration.x)
+            let yLiteral = String(format: "%.4f", restoration.y)
+
+            let script = """
+            (() => {
+                const restore = () => {
+                    const body = document.body;
+                    const root = document.documentElement;
+                    if (!root) {
+                        return false;
+                    }
+
+                    const scrollWidth = Math.max(
+                        root.scrollWidth || 0,
+                        body ? body.scrollWidth || 0 : 0
+                    );
+                    const scrollHeight = Math.max(
+                        root.scrollHeight || 0,
+                        body ? body.scrollHeight || 0 : 0
+                    );
+                    const viewportWidth = window.innerWidth || root.clientWidth || 0;
+                    const viewportHeight = window.innerHeight || root.clientHeight || 0;
+                    const maxX = Math.max(0, scrollWidth - viewportWidth);
+                    const maxY = Math.max(0, scrollHeight - viewportHeight);
+                    const targetX = Math.max(0, Math.min(maxX, \(xLiteral)));
+                    const targetY = Math.max(0, Math.min(maxY, \(yLiteral)));
+
+                    window.scrollTo(targetX, targetY);
+                    return true;
+                };
+
+                window.requestAnimationFrame(() => {
+                    restore();
+                    window.setTimeout(restore, 80);
+                    window.setTimeout(restore, 250);
+                });
+                return true;
+            })();
+            """
+
+            webView.evaluateJavaScript(script) { _, error in
+                if let error {
+                    Logger.error("Restoring scroll position after reload failed: \(error.localizedDescription)")
                 }
             }
         }
