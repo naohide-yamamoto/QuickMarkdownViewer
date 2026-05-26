@@ -1821,6 +1821,9 @@ struct MarkdownWebView: NSViewRepresentable {
         /// One-shot scroll position to restore after a same-document reload.
         private var pendingScrollRestoration: ScrollRestoration?
 
+        /// One-shot numeric page zoom to restore after a same-document reload.
+        private var pendingPageZoomRestoration: CGFloat?
+
         /// Link router that decides whether to allow or cancel navigation.
         private let linkRoutingService = LinkRoutingService()
 
@@ -1968,6 +1971,7 @@ struct MarkdownWebView: NSViewRepresentable {
             htmlLoadSequence &+= 1
             let loadSequence = htmlLoadSequence
 
+            let pageZoomRestoration = preservingScrollPosition ? webView.pageZoom : nil
             let startLoad: (ScrollRestoration?) -> Void = { [weak self, weak webView] restoration in
                 guard let self, let webView else {
                     return
@@ -1978,7 +1982,8 @@ struct MarkdownWebView: NSViewRepresentable {
                 }
 
                 self.pendingScrollRestoration = restoration
-                self.shouldApplyInitialZoomToFitOnNextDidFinish = true
+                self.pendingPageZoomRestoration = pageZoomRestoration
+                self.shouldApplyInitialZoomToFitOnNextDidFinish = pageZoomRestoration == nil
                 self.prepareForLoadTransition(on: webView)
                 self.lastHTMLLoadStartedAt = DispatchTime.now()
                 Logger.info(
@@ -1990,6 +1995,7 @@ struct MarkdownWebView: NSViewRepresentable {
 
             guard preservingScrollPosition else {
                 pendingScrollRestoration = nil
+                pendingPageZoomRestoration = nil
                 startLoad(nil)
                 return
             }
@@ -2153,6 +2159,7 @@ struct MarkdownWebView: NSViewRepresentable {
             applyDocumentDensityPreferenceIfNeeded(on: webView, force: true)
 
             guard shouldApplyInitialZoomToFitOnNextDidFinish else {
+                restorePendingPageZoomAfterLoadIfNeeded(on: webView)
                 restorePendingScrollPositionAfterLoadIfNeeded(on: webView)
                 return
             }
@@ -2165,6 +2172,7 @@ struct MarkdownWebView: NSViewRepresentable {
                     Logger.info(
                         "[PERF] initial-fit file=\(self.currentDocumentURL?.lastPathComponent ?? "unknown") success=true ms=\(self.formatMilliseconds(fitMilliseconds))"
                     )
+                    self.restorePendingPageZoomAfterLoadIfNeeded(on: webView)
                     self.restorePendingScrollPositionAfterLoadIfNeeded(on: webView)
                     return
                 }
@@ -2177,9 +2185,20 @@ struct MarkdownWebView: NSViewRepresentable {
                     if !success {
                         Logger.error("Initial zoom-to-fit after document load failed.")
                     }
+                    self.restorePendingPageZoomAfterLoadIfNeeded(on: webView)
                     self.restorePendingScrollPositionAfterLoadIfNeeded(on: webView)
                 }
             }
+        }
+
+        /// Restores the numeric zoom that was active before a same-document reload.
+        private func restorePendingPageZoomAfterLoadIfNeeded(on webView: WKWebView) {
+            guard let pageZoom = pendingPageZoomRestoration else {
+                return
+            }
+
+            pendingPageZoomRestoration = nil
+            webView.pageZoom = pageZoom
         }
 
         /// Restores the saved viewport after WebKit replaces same-document HTML.
