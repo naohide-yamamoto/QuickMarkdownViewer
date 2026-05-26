@@ -7,7 +7,7 @@ It is designed to feel like Preview for Markdown:
 - Open immediately in a rendered document window
 - No source pane and no editing UI
 
-Current release: `v1.1.1`.
+Current release: `v1.1.2`.
 
 ## Contents
 

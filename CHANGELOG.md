@@ -4,6 +4,19 @@ All notable changes to Stillic are tracked in this file from `v1.0.4` onwards.
 
 This project loosely follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and uses semantic versioning.
 
+## [1.1.2] - 2026-05-27
+
+### Fixed
+- Preserved scroll position when an open Markdown document refreshes after external edits.
+- Preserved the numeric zoom level when an open Markdown document refreshes after external edits.
+
+### Changed
+- Updated app version metadata:
+  - `MARKETING_VERSION = 1.1.2`
+  - `CURRENT_PROJECT_VERSION = 9`
+  - `CFBundleShortVersionString = 1.1.2`
+  - `CFBundleVersion = 9`
+
 ## [1.1.1] - 2026-04-22
 
 ### Changed
