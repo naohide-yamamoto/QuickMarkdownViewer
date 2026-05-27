@@ -64,6 +64,12 @@ if ! command -v xcrun >/dev/null 2>&1; then
   echo "error: xcrun not found. Install Xcode command line tools first." >&2
   exit 1
 fi
+for required_command in codesign ditto shasum spctl; do
+  if ! command -v "${required_command}" >/dev/null 2>&1; then
+    echo "error: ${required_command} not found. Install Xcode command line tools first." >&2
+    exit 1
+  fi
+done
 if [[ ! -x "/usr/libexec/PlistBuddy" ]]; then
   echo "error: /usr/libexec/PlistBuddy not found. Install Xcode command line tools first." >&2
   exit 1
@@ -93,20 +99,44 @@ fi
 
 ZIP_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-v${APP_VERSION}-macOS.zip"
 SHA256_PATH="${OUTPUT_DIR}/${ASSET_BASENAME}-v${APP_VERSION}-macOS-SHA256.txt"
+TMP_WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/stillic-notarise.XXXXXX")"
+cleanup() {
+  rm -rf "${TMP_WORK_DIR}"
+}
+trap cleanup EXIT
 
-echo "==> Creating release ZIP"
 rm -f "${ZIP_PATH}" "${SHA256_PATH}"
-ditto -c -k --norsrc --keepParent "${APP_PATH}" "${ZIP_PATH}"
+NOTARISATION_ZIP_PATH="${TMP_WORK_DIR}/${ASSET_BASENAME}-v${APP_VERSION}-macOS-notarisation.zip"
+EXTRACT_DIR="${TMP_WORK_DIR}/extracted"
+EXTRACTED_APP_PATH="${EXTRACT_DIR}/$(basename "${APP_PATH}")"
+
+echo "==> Creating temporary ZIP for notarisation"
+ditto -c -k --norsrc --keepParent "${APP_PATH}" "${NOTARISATION_ZIP_PATH}"
 
 echo "==> Submitting ZIP for notarisation"
-xcrun notarytool submit "${ZIP_PATH}" --keychain-profile "${KEYCHAIN_PROFILE}" --wait
+xcrun notarytool submit "${NOTARISATION_ZIP_PATH}" --keychain-profile "${KEYCHAIN_PROFILE}" --wait
 
 echo "==> Stapling notarisation ticket to app"
 xcrun stapler staple "${APP_PATH}"
+
+echo "==> Validating stapled app bundle"
+codesign --verify --deep --strict --verbose=4 "${APP_PATH}"
+spctl -a -t exec -vv "${APP_PATH}"
 xcrun stapler validate "${APP_PATH}"
 
-echo "==> Gatekeeper validation"
-spctl -a -t exec -vv "${APP_PATH}"
+echo "==> Creating final release ZIP from stapled app"
+ditto -c -k --norsrc --keepParent "${APP_PATH}" "${ZIP_PATH}"
+
+echo "==> Validating final release ZIP"
+mkdir -p "${EXTRACT_DIR}"
+ditto -x -k "${ZIP_PATH}" "${EXTRACT_DIR}"
+if [[ ! -d "${EXTRACTED_APP_PATH}" ]]; then
+  echo "error: final ZIP did not contain $(basename "${APP_PATH}")" >&2
+  exit 1
+fi
+codesign --verify --deep --strict --verbose=4 "${EXTRACTED_APP_PATH}"
+spctl -a -t exec -vv "${EXTRACTED_APP_PATH}"
+xcrun stapler validate "${EXTRACTED_APP_PATH}"
 
 echo "==> Writing SHA256 checksum"
 (

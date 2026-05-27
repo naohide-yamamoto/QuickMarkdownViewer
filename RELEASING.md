@@ -101,11 +101,13 @@ scripts/release/make_signed_release.sh --keychain-profile STILLIC_NOTARY
   - Builds a Release archive.
   - Exports a signed `.app` using Developer ID method.
 - `scripts/release/notarise_and_package.sh`
-  - Zips the app bundle.
-  - Submits ZIP to Apple notary service and waits for result.
+  - Creates a temporary ZIP for Apple notarisation submission.
+  - Submits the temporary ZIP to Apple notary service and waits for result.
   - Staples notarisation ticket to the app.
-  - Runs Gatekeeper validation.
-  - Writes SHA256 checksum.
+  - Validates the stapled app with `codesign`, Gatekeeper, and `stapler`.
+  - Creates the final public ZIP from the stapled app.
+  - Extracts the final public ZIP and validates the extracted app with `codesign`, Gatekeeper, and `stapler`.
+  - Writes SHA256 checksum for the final public ZIP.
 - `scripts/release/make_signed_release.sh`
   - Runs both scripts in order.
 
